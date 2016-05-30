@@ -1,0 +1,36 @@
+From 656c16bf9a399ea3154a12f24846323bfe3ef4e5 Mon Sep 17 00:00:00 2001
+From: "Xiang, Haihao" <haihao.xiang@intel.com>
+Date: Mon, 11 Apr 2016 16:22:18 +0800
+Subject: Set the right alignment on BXT/KBL
+
+With the commit 'CSC: Remove average logic when saving NV12 surface on IVB+',
+This fixes https://bugs.freedesktop.org/show_bug.cgi?id=94845 on BXT/KBL
+
+Reviewed-by: Kelley, Sean V <sean.v.kelley@intel.com>
+Signed-off-by: Xiang, Haihao <haihao.xiang@intel.com>
+
+diff --git a/src/i965_device_info.c b/src/i965_device_info.c
+index 6ac1d0c..c777a0d 100644
+--- a/src/i965_device_info.c
++++ b/src/i965_device_info.c
+@@ -378,7 +378,7 @@ static struct hw_codec_info bxt_hw_codec_info = {
+ 
+     .max_width = 4096,
+     .max_height = 4096,
+-    .min_linear_wpitch = 64,
++    .min_linear_wpitch = 128,
+     .min_linear_hpitch = 16,
+ 
+     .h264_mvc_dec_profiles = (VA_PROFILE_MASK(H264StereoHigh) |
+@@ -430,7 +430,7 @@ static struct hw_codec_info kbl_hw_codec_info = {
+ 
+     .max_width = 4096,
+     .max_height = 4096,
+-    .min_linear_wpitch = 64,
++    .min_linear_wpitch = 128,
+     .min_linear_hpitch = 16,
+ 
+     .h264_mvc_dec_profiles = (VA_PROFILE_MASK(H264StereoHigh) |
+-- 
+cgit v0.10.2
+

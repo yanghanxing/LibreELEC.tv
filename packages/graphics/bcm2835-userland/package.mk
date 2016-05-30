@@ -16,14 +16,15 @@
 #  along with OpenELEC.  If not, see <http://www.gnu.org/licenses/>.
 ################################################################################
 
-PKG_NAME="bcm2835-driver"
-PKG_VERSION="3b98f74"
+PKG_NAME="bcm2835-userland"
+PKG_VERSION="17c28b9"
 PKG_REV="1"
 PKG_ARCH="any"
 PKG_LICENSE="nonfree"
 PKG_SITE="http://www.broadcom.com"
-PKG_URL="$DISTRO_SRC/$PKG_NAME-$PKG_VERSION.tar.xz"
-PKG_DEPENDS_TARGET="toolchain dtc bcm2835-userland"
+PKG_URL="https://github.com/raspberrypi/userland/archive/$PKG_VERSION.tar.gz"
+PKG_SOURCE_DIR="userland-$PKG_VERSION*"
+PKG_DEPENDS_TARGET="toolchain"
 PKG_PRIORITY="optional"
 PKG_SECTION="graphics"
 PKG_SHORTDESC="OpenMAX-bcm2835: OpenGL-ES and OpenMAX driver for BCM2835"
@@ -32,29 +33,27 @@ PKG_LONGDESC="OpenMAX-bcm2835: OpenGL-ES and OpenMAX driver for BCM2835"
 PKG_IS_ADDON="no"
 PKG_AUTORECONF="no"
 
-if [ "$TARGET_FLOAT" = "softfp" -o "$TARGET_FLOAT" = "soft" ]; then
-  FLOAT="softfp"
-elif [ "$TARGET_FLOAT" = "hard" ]; then
-  FLOAT="hardfp"
+if [ "$DEBUG" = yes ]; then
+  CMAKE_BUILD_TYPE="Debug"
+else
+  CMAKE_BUILD_TYPE="Release"
 fi
 
-make_target() {
-  : # nothing to do here
+configure_target() {
+  export LDFLAGS=`echo $LDFLAGS | sed -e "s|-Wl,--as-needed||"`
+  cmake -DCMAKE_TOOLCHAIN_FILE=$CMAKE_CONF \
+        -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE \
+        -DVMCS_INSTALL_PREFIX=/usr \
+        ..
 }
 
-makeinstall_target() {
-# some usefull debug tools
-  mkdir -p $INSTALL/usr/bin
-    cp -PRv $FLOAT/opt/vc/bin/dtoverlay $INSTALL/usr/bin
-    ln -s dtoverlay $INSTALL/usr/bin/dtparam
-    cp -PRv $FLOAT/opt/vc/bin/vcdbg $INSTALL/usr/bin
-    cp -PRv $FLOAT/opt/vc/bin/edidparser $INSTALL/usr/bin
-
-  mkdir -p $INSTALL/opt/vc
-    ln -sf /usr/lib $INSTALL/opt/vc/lib
-}
-
-post_install() {
-  enable_service fbset.service
-  enable_service unbind-console.service
+post_makeinstall_target() {
+  rm -rf $INSTALL/etc
+  rm -rf $INSTALL/usr/bin/containers_*
+  rm -rf $INSTALL/usr/bin/dt*
+  rm -rf $INSTALL/usr/bin/raspi*
+  rm -rf $INSTALL/usr/bin/vchiq_test
+  rm -rf $INSTALL/usr/lib/plugins
+  rm -rf $INSTALL/usr/share
+  rm -rf $INSTALL/usr/src
 }

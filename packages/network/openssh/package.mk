@@ -64,6 +64,9 @@ post_makeinstall_target() {
   rm -rf $INSTALL/usr/bin/ssh-agent
   rm -rf $INSTALL/usr/bin/ssh-keyscan
 
+  mkdir -p $INSTALL/usr/share/services
+    cp -P $PKG_DIR/default.d/*.conf $INSTALL/usr/share/services
+
   sed -i $INSTALL/etc/ssh/sshd_config -e "s|^#PermitRootLogin.*|PermitRootLogin yes|g"
   echo "PubkeyAcceptedKeyTypes +ssh-dss" >> $INSTALL/etc/ssh/sshd_config
 
@@ -74,5 +77,6 @@ post_install() {
   add_user sshd x 74 74 "Privilege-separated SSH" "/var/empty/sshd" "/bin/sh"
   add_group sshd 74
 
+  enable_service sshd-defaults.service
   enable_service sshd.service
 }

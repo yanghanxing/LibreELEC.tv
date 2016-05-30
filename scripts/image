@@ -44,6 +44,9 @@ if [ "$LIBREELEC_VERSION" = "devel" ]; then
   DEVEL_VERSION=$LIBREELEC_VERSION
   LIBREELEC_VERSION=$LIBREELEC_VERSION-$BUILD_DATE-r$GIT_BUILD-g$GIT_ABBREV
 fi
+if [ -n "$OPENPHT_VERSION" ]; then
+  LIBREELEC_VERSION=$OPENPHT_VERSION
+fi
 
 # Get origin url, fix git:// and git@github.com: urls if necessary
 ORIGIN_URL="$(git remote -v | awk '$1 == "origin" { print $2 }' | head -1 | sed 's#\.git$##;s#^git:#https:#;s#^git@github\.com:#https://github.com/#')"
@@ -58,6 +61,9 @@ TARGET_VERSION="$PROJECT.$TARGET_ARCH-$LIBREELEC_VERSION"
 IMAGE_NAME="$DISTRONAME-$TARGET_VERSION"
 if [ "$DEVEL_VERSION" = "devel" ] ; then
   IMAGE_NAME="$DISTRONAME-$PROJECT.$TARGET_ARCH-$OS_VERSION-$LIBREELEC_VERSION"
+fi
+if [ -n "$OPENPHT_VERSION" ]; then
+  IMAGE_NAME="$DISTRONAME-$OPENPHT_VERSION-$PROJECT.$TARGET_ARCH"
 fi
 
 if [ "$PROJECT" == "imx6" -a -n "$SYSTEM" ]; then

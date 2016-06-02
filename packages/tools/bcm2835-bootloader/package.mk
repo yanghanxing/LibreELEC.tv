@@ -17,7 +17,7 @@
 ################################################################################
 
 PKG_NAME="bcm2835-bootloader"
-PKG_VERSION="3b98f74"
+PKG_VERSION="7fcb39c"
 PKG_REV="1"
 PKG_ARCH="arm"
 PKG_LICENSE="nonfree"

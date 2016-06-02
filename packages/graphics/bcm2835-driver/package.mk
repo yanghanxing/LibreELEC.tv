@@ -45,8 +45,6 @@ make_target() {
 makeinstall_target() {
 # some usefull debug tools
   mkdir -p $INSTALL/usr/bin
-    cp -PRv $FLOAT/opt/vc/bin/dtoverlay $INSTALL/usr/bin
-    ln -s dtoverlay $INSTALL/usr/bin/dtparam
     cp -PRv $FLOAT/opt/vc/bin/vcdbg $INSTALL/usr/bin
     cp -PRv $FLOAT/opt/vc/bin/edidparser $INSTALL/usr/bin
 

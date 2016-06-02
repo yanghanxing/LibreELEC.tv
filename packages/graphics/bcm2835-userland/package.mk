@@ -17,7 +17,7 @@
 ################################################################################
 
 PKG_NAME="bcm2835-userland"
-PKG_VERSION="17c28b9"
+PKG_VERSION="ed59ee1"
 PKG_REV="1"
 PKG_ARCH="any"
 PKG_LICENSE="nonfree"
@@ -50,7 +50,7 @@ configure_target() {
 post_makeinstall_target() {
   rm -rf $INSTALL/etc
   rm -rf $INSTALL/usr/bin/containers_*
-  rm -rf $INSTALL/usr/bin/dt*
+  rm -rf $INSTALL/usr/bin/dtoverlay-*
   rm -rf $INSTALL/usr/bin/raspi*
   rm -rf $INSTALL/usr/bin/vchiq_test
   rm -rf $INSTALL/usr/lib/plugins

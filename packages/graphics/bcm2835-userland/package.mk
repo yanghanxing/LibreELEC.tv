@@ -17,7 +17,7 @@
 ################################################################################
 
 PKG_NAME="bcm2835-userland"
-PKG_VERSION="ed59ee1"
+PKG_VERSION="7c026fa"
 PKG_REV="1"
 PKG_ARCH="any"
 PKG_LICENSE="nonfree"

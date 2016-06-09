@@ -39,7 +39,12 @@ rtl8192c_rf6052\: PHY_RFShadowRefresh\(\)\: fix off-by-one
 rtl8192cu\: Add PID for D-Link DWA 131
 Added Device IDs for August DVB-T 205
 pinctrl-bcm2835\: Fix cut-and-paste error in \"pull\" parsing
-net\: fix bridge multicast packet checksum validation"
+net\: fix bridge multicast packet checksum validation
+clk\: bcm2835\: add locking to pll\*\_on\/off methods
+clk\: bcm2835\: pll_off should only update CM\_PLL\_ANARST
+clk\: bcm2835\: divider value has to be 1 or more
+clk\: bcm2835\: Fix PLL poweron
+Enable cfg80211 support"
 
 IFS=$'\n'
 for COMMIT in $DROP_COMMITS; do

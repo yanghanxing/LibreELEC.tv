@@ -23,7 +23,7 @@
 # git fetch --all --depth=1000
 # git reset --hard origin/rpi-4.4.y
 # GIT_SEQUENCE_EDITOR=../rpi-linux-rebase.sh git rebase -i linux-stable/linux-4.4.y
-# git format-patch --no-signature --stdout linux-stable/linux-4.4.y > ../linux-01-RPi_support.patch
+# git format-patch --no-renames --no-signature --stdout linux-stable/linux-4.4.y > ../linux-01-RPi_support.patch
 
 TODO=$1
 
@@ -44,7 +44,17 @@ clk\: bcm2835\: add locking to pll\*\_on\/off methods
 clk\: bcm2835\: pll_off should only update CM\_PLL\_ANARST
 clk\: bcm2835\: divider value has to be 1 or more
 clk\: bcm2835\: Fix PLL poweron
-Enable cfg80211 support"
+Enable cfg80211 support
+suppress spurious messages
+Add #if for 3\.14 kernel change \(#87\)
+Set dev_type to wlan
+Tentatively added support for more 8188CUS based devices\.
+Add support for more 8188CUS and 8192CUS devices
+Add ProductId for the Netgear N150 - WNA1000M
+Fixes CONFIG_CONCURRENT_MODE CONFIG_MULTI_VIR_IFACES
+Fixes compatibility with 3\.13
+Enables warning in the compiler and fixes some issues, reference => https\:\/\/github\.com\/diederikdehaas\/rtl8812AU
+Starts device in station mode instead of monitor, fixes NetworkManager issues"
 
 IFS=$'\n'
 for COMMIT in $DROP_COMMITS; do

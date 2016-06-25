@@ -14,13 +14,13 @@
 ################################################################################
 
 PKG_NAME="hyperion"
-PKG_VERSION="f64b6eb"
+PKG_VERSION="d2f4725"
 PKG_REV="1"
 PKG_ARCH="any"
 PKG_LICENSE="GPL"
 PKG_SITE="https://github.com/tvdzwan/hyperion"
-PKG_URL="$DISTRO_SRC/$PKG_NAME-$PKG_VERSION.tar.xz"
-PKG_DEPENDS_TARGET="toolchain ninja:host Python libusb protobuf Qt4"
+PKG_URL="https://github.com/hyperion-project/hyperion/archive/$PKG_VERSION.tar.gz"
+PKG_DEPENDS_TARGET="toolchain ninja:host Python libusb protobuf Qt4 rpi_ws281x"
 PKG_PRIORITY="optional"
 PKG_SECTION="graphics"
 PKG_SHORTDESC="Hyperion: an AmbiLight controller"
@@ -47,12 +47,16 @@ elif [ "$DISPLAYSERVER" = "x11" ]; then
   X11_SUPPORT="-DENABLE_X11=1"
 fi
 
+pre_build_target() {
+  cp -a $(get_build_dir rpi_ws281x)/* $ROOT/$PKG_BUILD/dependencies/external/rpi_ws281x
+}
+
 configure_target() {
   if [ "$DEBUG" = yes ]; then
     CMAKE_BUILD_TYPE="Debug"
   else
     CMAKE_BUILD_TYPE="Release"
- fi
+  fi
 
   echo "" > ../cmake/FindGitVersion.cmake
   cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=$CMAKE_CONF \
@@ -64,12 +68,12 @@ configure_target() {
         $DISPMANX_SUPPORT \
         $FB_SUPPORT \
         -DENABLE_OSX=0 \
-        -DENABLE_PROTOBUF=1 \
+        -DUSE_SYSTEM_PROTO_LIBS=ON \
         -DENABLE_SPIDEV=1 \
         -DENABLE_TINKERFORGE=0 \
         -DENABLE_V4L2=1 \
         $WS2812BPWM_SUPPORT \
-        -DENABLE_WS281XPWM=0 \
+        -DENABLE_WS281XPWM=1 \
         $X11_SUPPORT \
         -DENABLE_QT5=0 \
         -DENABLE_TESTS=0 \

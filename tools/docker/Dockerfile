@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y \
     default-jre-headless \
     libncurses5-dev \
     libxml-parser-perl \
+    u-boot-tools \
     --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 

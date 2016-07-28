@@ -14,7 +14,7 @@
 ################################################################################
 
 PKG_NAME="hyperion"
-PKG_VERSION="d2f4725"
+PKG_VERSION="85fcec3"
 PKG_REV="1"
 PKG_ARCH="any"
 PKG_LICENSE="GPL"

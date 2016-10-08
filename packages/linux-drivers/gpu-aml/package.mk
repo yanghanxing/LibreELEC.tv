@@ -21,8 +21,9 @@ PKG_REV="1"
 PKG_ARCH="arm aarch64"
 PKG_LICENSE="GPL"
 PKG_SITE="http://openlinux.amlogic.com:8000/download/ARM/gpu/"
-PKG_VERSION="r6p1-01rel0-2364187"
-PKG_URL="$DISTRO_SRC/$PKG_NAME-$PKG_VERSION.tar.xz"
+PKG_VERSION="fe6d7b1d1b"
+PKG_URL="https://github.com/openwetek/gpu-aml/archive/$PKG_VERSION.tar.gz"
+PKG_SOURCE_DIR="$PKG_NAME-$PKG_VERSION*"
 PKG_DEPENDS_TARGET="toolchain linux"
 PKG_NEED_UNPACK="$LINUX_DEPENDS"
 PKG_SECTION="driver"
@@ -34,7 +35,8 @@ PKG_AUTORECONF="no"
 
 make_target() {
   LDFLAGS="" make -C $(kernel_path) M=$ROOT/$PKG_BUILD/mali \
-    CONFIG_MALI400=m CONFIG_MALI450=m
+    CONFIG_MALI400=m CONFIG_MALI450=m \
+    EXTRA_CFLAGS="-DCONFIG_MALI400=m -DCONFIG_MALI450=m"
 }
 
 makeinstall_target() {

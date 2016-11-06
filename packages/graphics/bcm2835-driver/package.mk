@@ -17,7 +17,7 @@
 ################################################################################
 
 PKG_NAME="bcm2835-driver"
-PKG_VERSION="d0bc6ce"
+PKG_VERSION="c53b9e5"
 PKG_REV="1"
 PKG_ARCH="any"
 PKG_LICENSE="nonfree"
@@ -43,6 +43,9 @@ make_target() {
 }
 
 makeinstall_target() {
+  mkdir -p $INSTALL/usr/lib
+    cp -PRv $FLOAT/opt/vc/lib/libelftoolchain.so $INSTALL/usr/lib
+
 # some usefull debug tools
   mkdir -p $INSTALL/usr/bin
     cp -PRv $FLOAT/opt/vc/bin/vcdbg $INSTALL/usr/bin

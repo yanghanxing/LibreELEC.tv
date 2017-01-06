@@ -17,6 +17,8 @@ setup_toolchain() {
       export CFLAGS="$TARGET_CFLAGS"
       export CXXFLAGS="$TARGET_CXXFLAGS"
       export LDFLAGS="$TARGET_LDFLAGS"
+      export PYTHON="$ROOT/$TOOLCHAIN/bin/python"
+      export PYTHON_CONFIG="$SYSROOT_PREFIX/usr/bin/python-config"
       export PKG_CONFIG_PATH=""
       export PKG_CONFIG_LIBDIR="$SYSROOT_PREFIX/usr/lib/pkgconfig:$SYSROOT_PREFIX/usr/share/pkgconfig"
       export PKG_CONFIG_SYSROOT_DIR="$SYSROOT_PREFIX"
@@ -66,6 +68,8 @@ setup_toolchain() {
       export CFLAGS="$HOST_CFLAGS"
       export CXXFLAGS="$HOST_CXXFLAGS"
       export LDFLAGS="$HOST_LDFLAGS"
+      export PYTHON="$ROOT/$TOOLCHAIN/bin/python"
+      export PYTHON_CONFIG="$ROOT/$TOOLCHAIN/bin/python-config"
       export PKG_CONFIG_PATH=""
       export PKG_CONFIG_LIBDIR="$ROOT/$TOOLCHAIN/lib/pkgconfig:$ROOT/$TOOLCHAIN/share/pkgconfig"
       export PKG_CONFIG_SYSROOT_DIR=""
@@ -93,6 +97,9 @@ setup_toolchain() {
       export CXX_FOR_BUILD="$CXX"
       export BUILD_CC="$CC"
       export BUILD_CXX="$CXX"
+      unset _python_sysroot
+      unset _python_prefix
+      unset _python_exec_prefix
       ;;
   esac
 }

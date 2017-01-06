@@ -32,12 +32,25 @@ PKG_LONGDESC="Python is an interpreted object-oriented programming language, and
 PKG_IS_ADDON="no"
 PKG_AUTORECONF="yes"
 
-PY_DISABLED_MODULES="_tkinter nis gdbm bsddb ossaudiodev"
-
-PKG_CONFIGURE_OPTS_HOST="--cache-file=config.cache \
+PKG_CONFIGURE_OPTS_HOST="ac_cv_prog_HAS_HG=/bin/false \
+                         ac_cv_prog_SVNVERSION=/bin/false \
+                         --enable-static \
                          --without-cxx-main \
-                         --with-threads \
-                         --enable-unicode=ucs4"
+                         --disable-sqlite3 \
+                         --disable-tk \
+                         --with-expat=builtin \
+                         --disable-curses \
+                         --disable-codecs-cjk \
+                         --disable-nis \
+                         --enable-unicodedata \
+                         --disable-dbm \
+                         --disable-gdbm \
+                         --disable-bsddb \
+                         --disable-test-modules \
+                         --disable-bz2 \
+                         --disable-ssl \
+                         --disable-ossaudiodev \
+                         --disable-pyo-build"
 
 PKG_CONFIGURE_OPTS_TARGET="ac_cv_file_dev_ptc=no \
                            ac_cv_file_dev_ptmx=yes \
@@ -50,19 +63,31 @@ PKG_CONFIGURE_OPTS_TARGET="ac_cv_file_dev_ptc=no \
                            ac_cv_file__dev_ptmx=no \
                            ac_cv_file__dev_ptc=no \
                            ac_cv_have_long_long_format=yes \
-                           --with-threads \
+                           ac_cv_working_tzset=yes \
+                           ac_cv_prog_HAS_HG=/bin/false \
+                           ac_cv_prog_SVNVERSION=/bin/false \
+                           --with-expat=system \
+                           --disable-bsddb \
+                           --enable-sqlite3 \
+                           --enable-ssl \
+                           --disable-codecs-cjk \
+                           --enable-unicodedata \
                            --enable-unicode=ucs4 \
-                           --enable-ipv6 \
-                           --disable-profiling \
-                           --without-pydebug \
-                           --without-doc-strings \
-                           --without-tsc \
-                           --with-pymalloc \
-                           --without-fpectl \
-                           --with-wctype-functions \
+                           --enable-bz2 \
+                           --enable-zlib \
+                           --disable-ossaudiodev \
                            --without-cxx-main \
+                           --without-doc-strings \
                            --with-system-ffi \
-                           --with-system-expat"
+                           --disable-pydoc \
+                           --disable-test-modules \
+                           --disable-gdbm \
+                           --disable-tk \
+                           --disable-nis \
+                           --disable-dbm \
+                           --disable-pyo-build \
+                           --disable-pyc-build"
+
 post_patch() {
   # This is needed to make sure the Python build process doesn't try to
   # regenerate those files with the pgen program. Otherwise, it builds
@@ -71,57 +96,23 @@ post_patch() {
     touch $PKG_BUILD/Python/graminit.c
 }
 
+pre_configure_host() {
+  export CPPFLAGS="$CPPFLAGS -I$ROOT/$TOOLCHAIN/include"
+  export LDFLAGS="$LDFLAGS -Wl,--enable-new-dtags"
+}
+
 make_host() {
-  make PYTHON_MODULES_INCLUDE="$HOST_INCDIR" \
-       PYTHON_MODULES_LIB="$HOST_LIBDIR" \
-       PYTHON_DISABLE_MODULES="readline _curses _curses_panel $PY_DISABLED_MODULES"
-
-  # python distutils per default adds -L$LIBDIR when linking binary extensions
-    sed -e "s|^ 'LIBDIR':.*| 'LIBDIR': '/usr/lib',|g" -i $(cat pybuilddir.txt)/_sysconfigdata.py
-}
-
-makeinstall_host() {
-  make PYTHON_MODULES_INCLUDE="$HOST_INCDIR" \
-       PYTHON_MODULES_LIB="$HOST_LIBDIR" \
-       PYTHON_DISABLE_MODULES="readline _curses _curses_panel $PY_DISABLED_MODULES" \
-       install
-}
-
-pre_configure_target() {
-  export PYTHON_FOR_BUILD=$ROOT/$TOOLCHAIN/bin/python
-}
-
-make_target() {
-  make  -j1 CC="$CC" LDFLAGS="$TARGET_LDFLAGS -L." \
-        PYTHON_DISABLE_MODULES="$PY_DISABLED_MODULES" \
-        PYTHON_MODULES_INCLUDE="$TARGET_INCDIR" \
-        PYTHON_MODULES_LIB="$TARGET_LIBDIR"
-}
-
-makeinstall_target() {
-  make  -j1 CC="$CC" DESTDIR=$SYSROOT_PREFIX \
-        PYTHON_DISABLE_MODULES="$PY_DISABLED_MODULES" \
-        PYTHON_MODULES_INCLUDE="$TARGET_INCDIR" \
-        PYTHON_MODULES_LIB="$TARGET_LIBDIR" \
-        install
-
-  make  -j1 CC="$CC" DESTDIR=$INSTALL \
-        PYTHON_DISABLE_MODULES="$PY_DISABLED_MODULES" \
-        PYTHON_MODULES_INCLUDE="$TARGET_INCDIR" \
-        PYTHON_MODULES_LIB="$TARGET_LIBDIR" \
-        install
+  make -j1 $PKG_MAKE_OPTS_HOST
 }
 
 post_makeinstall_target() {
-  EXCLUDE_DIRS="bsddb idlelib lib-tk lib2to3 msilib pydoc_data test unittest"
+  EXCLUDE_DIRS="lib2to3 ensurepip config compiler distutils sysconfigdata unittest"
   for dir in $EXCLUDE_DIRS; do
     rm -rf $INSTALL/usr/lib/python*/$dir
   done
+  rm -rf $INSTALL/usr/lib/python*/lib-dynload/sysconfigdata
 
-  rm -rf $INSTALL/usr/lib/python*/config
   rm -rf $INSTALL/usr/bin/2to3
-  rm -rf $INSTALL/usr/bin/idle
-  rm -rf $INSTALL/usr/bin/pydoc
   rm -rf $INSTALL/usr/bin/smtpd.py
   rm -rf $INSTALL/usr/bin/python*-config
 

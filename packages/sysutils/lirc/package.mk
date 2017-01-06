@@ -38,6 +38,10 @@ PKG_CONFIGURE_OPTS_TARGET="ac_cv_func_forkpty=no \
                            --with-gnu-ld \
                            --without-x"
 
+pre_configure_target() {
+  unset PYTHON
+}
+
 post_makeinstall_target() {
   rm -rf $INSTALL/usr/lib/systemd
   rm -rf $INSTALL/lib

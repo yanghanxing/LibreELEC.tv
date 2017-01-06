@@ -23,7 +23,7 @@ PKG_ARCH="any"
 PKG_LICENSE="LGPL"
 PKG_SITE="https://www.dlitz.net/software/pycrypto/"
 PKG_URL="http://pypi.python.org/packages/source/p/$PKG_NAME/$PKG_NAME-$PKG_VERSION.tar.gz"
-PKG_DEPENDS_TARGET="toolchain Python distutilscross:host"
+PKG_DEPENDS_TARGET="toolchain Python setuptools:host"
 PKG_SECTION="python/security"
 PKG_SHORTDESC="PyCrypto - The Python Cryptography Toolkit"
 PKG_LONGDESC="The Python Cryptography Toolkit describes a package containing various cryptographic modules for the Python programming language"
@@ -39,13 +39,11 @@ pre_configure_target() {
   cd $ROOT/$PKG_BUILD
   rm -rf .$TARGET_NAME
 
-  export PYTHONXCPREFIX="$SYSROOT_PREFIX/usr"
-#  export LDFLAGS="$LDFLAGS -L$SYSROOT_PREFIX/usr/lib -L$SYSROOT_PREFIX/lib"
   export LDSHARED="$CC -shared"
 }
 
 make_target() {
-  python setup.py build --cross-compile
+  python setup.py build_ext
 }
 
 makeinstall_target() {

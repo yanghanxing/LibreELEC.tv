@@ -1,0 +1,64 @@
+From 0986ff44f8e281f21e6599c951a6a7f891742619 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Thu, 19 Jan 2017 00:56:49 +0100
+Subject: [PATCH 2/4] revert amlogic erratum 843419 835769
+
+---
+ arch/arm64/Kconfig  | 24 ------------------------
+ arch/arm64/Makefile |  6 ------
+ 2 files changed, 30 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0396b1c6d853..7316c9812252 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -222,30 +222,6 @@ config ARM64_ERRATUM_845719
+ 
+ 	  If unsure, say Y.
+ 
+-config ARM64_ERRATUM_843419
+-	bool "Cortex-A53: 843419: A load or store might access an incorrect address"
+-	depends on MODULES
+-	default y
+-	help
+-	  This option builds kernel modules using the large memory model in
+-	  order to avoid the use of the ADRP instruction, which can cause
+-	  a subsequent memory access to use an incorrect address on Cortex-A53
+-	  parts up to r0p4.
+-
+-	  Note that the kernel itself must be linked with a version of ld
+-	  which fixes potentially affected ADRP instructions through the
+-	  use of veneers.
+-
+-	  If unsure, say Y.
+-
+-config ARM64_ERRATUM_835769
+-	bool "Cortex-A53: 835769: AArch64 multiply-accumulate instruction might produce incorrect result"
+-	depends on MODULES
+-	default y
+-	help
+-	  This option build kernel with option -mfix-cortex-a53-835769 to
+-	  fix mulity-accumulate bug of cpu
+-
+ endmenu
+ 
+ 
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 84dc3e120f53..44976816b38d 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -38,14 +38,8 @@ CHECKFLAGS	+= -D__aarch64__
+ 
+ ifeq ($(CONFIG_ARM64_ERRATUM_843419), y)
+ KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+-KBUILD_CFLAGS_MODULE	+= $(call cc-option,-mfix-cortex-a53-843419)
+ endif
+ 
+-ifeq ($(CONFIG_ARM64_ERRATUM_835769), y)
+-KBUILD_CFLAGS_MODULE	+= $(call cc-option,-mfix-cortex-a53-835769)
+-endif
+-$(info KBUILD_CFLAGS_MODULE:$(KBUILD_CFLAGS_MODULE))
+-
+ # Default value
+ head-y		:= arch/arm64/kernel/head.o
+ 

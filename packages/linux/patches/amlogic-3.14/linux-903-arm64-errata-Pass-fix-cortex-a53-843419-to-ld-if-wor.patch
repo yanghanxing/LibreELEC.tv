@@ -1,0 +1,63 @@
+From 6ffe9923f2350c19b95a2c9ebf1b4f5f275986f2 Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Mon, 22 Aug 2016 11:58:36 +0100
+Subject: [PATCH] arm64: errata: Pass --fix-cortex-a53-843419 to ld if
+ workaround enabled
+
+Cortex-A53 erratum 843419 is worked around by the linker, although it is
+a configure-time option to GCC as to whether ld is actually asked to
+apply the workaround or not.
+
+This patch ensures that we pass --fix-cortex-a53-843419 to the linker
+when both CONFIG_ARM64_ERRATUM_843419=y and the linker supports the
+option.
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig  | 12 ++++--------
+ arch/arm64/Makefile |  8 ++++++++
+ 2 files changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1e49fbc4..0579f6e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -677,14 +677,10 @@ config ARM64_ERRATUM_843419
+ 	depends on MODULES
+ 	default y
+ 	help
+-	  This option builds kernel modules using the large memory model in
+-	  order to avoid the use of the ADRP instruction, which can cause
+-	  a subsequent memory access to use an incorrect address on Cortex-A53
+-	  parts up to r0p4.
+-
+-	  Note that the kernel itself must be linked with a version of ld
+-	  which fixes potentially affected ADRP instructions through the
+-	  use of veneers.
++	  This option links the kernel with '--fix-cortex-a53-843419' and
++	  builds modules using the large memory model in order to avoid the use
++	  of the ADRP instruction, which can cause a subsequent memory access
++	  to use an incorrect address on Cortex-A53 parts up to r0p4.
+ 
+ 	  If unsure, say Y.
+ 
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 5b54f8c..0b53c75 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -17,6 +17,14 @@ GZFLAGS		:=-9
+ 
+ LIBGCC		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
+ 
++ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
++  ifeq ($(call ld-option, --fix-cortex-a53-843419),)
++$(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
++  else
++LDFLAGS_vmlinux	+= --fix-cortex-a53-843419
++  endif
++endif
++
+ KBUILD_DEFCONFIG := defconfig
+ 
+ KBUILD_CFLAGS	+= -mgeneral-regs-only

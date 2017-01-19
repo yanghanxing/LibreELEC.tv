@@ -41,3 +41,5 @@ fi
 if [ "$DEBUG" = "yes" -a "$VALGRIND" = "yes" ]; then
   PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET valgrind"
 fi
+
+PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET memtest"

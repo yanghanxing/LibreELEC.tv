@@ -1,0 +1,4305 @@
+From e6c4d2a186807553d3b63fc6894580de895b6e31 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:22:36 +0100
+Subject: [PATCH 01/16] Revert "PD#130385: mm: optimize release time of cma"
+
+This reverts commit 81501950d4363fec4b61a0550bc89750320c2d8c.
+---
+ drivers/amlogic/amports/vh265.c |  4 +--
+ mm/page_alloc.c                 | 74 ++++++++---------------------------------
+ 2 files changed, 14 insertions(+), 64 deletions(-)
+
+diff --git a/drivers/amlogic/amports/vh265.c b/drivers/amlogic/amports/vh265.c
+index 6ed562b8a671..93e46bd50354 100644
+--- a/drivers/amlogic/amports/vh265.c
++++ b/drivers/amlogic/amports/vh265.c
+@@ -1430,7 +1430,6 @@ static void uninit_buf_list(struct hevc_state_s *hevc, bool force_free)
+ 	}
+ 
+ 	if (release_cma_flag) {
+-		pr_info("release cma begin\n");
+ 		for (i = 0; i < hevc->used_buf_num; i++) {
+ 			if (hevc->m_BUF[i].alloc_addr != 0
+ 				&& hevc->m_BUF[i].cma_page_count > 0) {
+@@ -1455,7 +1454,7 @@ static void uninit_buf_list(struct hevc_state_s *hevc, bool force_free)
+ 					}
+ 				}
+ 
+-				pr_debug("release cma buffer[%d] (%d %ld)\n", i,
++				pr_info("release cma buffer[%d] (%d %ld)\n", i,
+ 					hevc->m_BUF[i].cma_page_count,
+ 					hevc->m_BUF[i].alloc_addr);
+ 				codec_mm_free_for_dma(MEM_NAME,
+@@ -1465,7 +1464,6 @@ static void uninit_buf_list(struct hevc_state_s *hevc, bool force_free)
+ 
+ 			}
+ 		}
+-		pr_info("release cma end\n");
+ 	}
+ 	pr_info("%s, blackout %x r%x buf_mode %x r%x rel_cma_flag %x hevc->predisp_addr %d pre_alloc_addr(%ld, %ld)\n",
+ 		__func__, get_blackout_policy(), blackout,
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index cd09191bdebb..fb4a0323bcc5 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -163,7 +163,7 @@ bool pm_suspended_storage(void)
+ int pageblock_order __read_mostly;
+ #endif
+ 
+-static int __free_pages_ok(struct page *page, unsigned int order);
++static void __free_pages_ok(struct page *page, unsigned int order);
+ 
+ /*
+  * results with 256, 32 in the lowmem_reserve sysctl:
+@@ -584,7 +584,7 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
+  * -- nyc
+  */
+ 
+-static inline int __free_one_page(struct page *page,
++static inline void __free_one_page(struct page *page,
+ 		unsigned long pfn,
+ 		struct zone *zone, unsigned int order,
+ 		int migratetype)
+@@ -598,7 +598,7 @@ static inline int __free_one_page(struct page *page,
+ 
+ 	if (unlikely(PageCompound(page)))
+ 		if (unlikely(destroy_compound_page(page, order)))
+-			return -1;
++			return;
+ 
+ 	VM_BUG_ON(migratetype == -1);
+ 
+@@ -661,7 +661,6 @@ out:
+ 	zone->free_area[order].nr_free++;
+ 	if (is_migrate_cma(migratetype))
+ 		zone->free_area[order].nr_free_cma++;
+-	return order;
+ }
+ 
+ static inline int free_pages_check(struct page *page)
+@@ -757,25 +756,23 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+ 	spin_unlock(&zone->lock);
+ }
+ 
+-static int free_one_page(struct zone *zone,
++static void free_one_page(struct zone *zone,
+ 				struct page *page, unsigned long pfn,
+ 				unsigned int order,
+ 				int migratetype)
+ {
+ 	unsigned long nr_scanned;
+ 	int cur_migratetype;
+-	int free_order;
+ 	spin_lock(&zone->lock);
+ 	nr_scanned = zone_page_state(zone, NR_PAGES_SCANNED);
+ 	if (nr_scanned)
+ 		__mod_zone_page_state(zone, NR_PAGES_SCANNED, -nr_scanned);
+ 
+ 	cur_migratetype = get_pageblock_migratetype(page);
+-	free_order = __free_one_page(page, pfn, zone, order, cur_migratetype);
++	__free_one_page(page, pfn, zone, order, cur_migratetype);
+ 	if (unlikely(!is_migrate_isolate(cur_migratetype)))
+ 		__mod_zone_freepage_state(zone, 1 << order, cur_migratetype);
+ 	spin_unlock(&zone->lock);
+-	return free_order;
+ }
+ 
+ static bool free_pages_prepare(struct page *page, unsigned int order)
+@@ -805,23 +802,21 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
+ 	return true;
+ }
+ 
+-static int __free_pages_ok(struct page *page, unsigned int order)
++static void __free_pages_ok(struct page *page, unsigned int order)
+ {
+ 	unsigned long flags;
+ 	int migratetype;
+ 	unsigned long pfn = page_to_pfn(page);
+-	int free_order;
+ 
+ 	if (!free_pages_prepare(page, order))
+-		return -1;
++		return;
+ 
+ 	migratetype = get_pfnblock_migratetype(page, pfn);
+ 	local_irq_save(flags);
+ 	__count_vm_events(PGFREE, 1 << order);
+ 	set_freepage_migratetype(page, migratetype);
+-	free_order = free_one_page(page_zone(page), page, pfn, order, migratetype);
++	free_one_page(page_zone(page), page, pfn, order, migratetype);
+ 	local_irq_restore(flags);
+-	return free_order;
+ }
+ 
+ void __init __free_pages_bootmem(struct page *page, unsigned int order)
+@@ -3082,24 +3077,6 @@ void __free_pages(struct page *page, unsigned int order)
+ 
+ EXPORT_SYMBOL(__free_pages);
+ 
+-int __free_pages_cma(struct page *page, unsigned int order, unsigned int *cnt)
+-{
+-	int i;
+-	int ref = 0;
+-
+-	/* clear ref count first */
+-	for (i = 0; i < (1 << order); i++) {
+-		if (!put_page_testzero(page + i))
+-			ref++;
+-	}
+-	if (ref) {
+-		pr_info("%s, %d pages are still in use\n", __func__, ref);
+-		*cnt += ref;
+-		return -1;
+-	}
+-	return __free_pages_ok(page, order);
+-}
+-
+ void free_pages(unsigned long addr, unsigned int order)
+ {
+ 	if (addr != 0) {
+@@ -6668,37 +6645,12 @@ done:
+ void free_contig_range(unsigned long pfn, unsigned nr_pages)
+ {
+ 	unsigned int count = 0;
+-	struct page *page;
+-	int free_order, start_order = 0;
+-	int batch;
+ 
+-	while (nr_pages) {
+-		page = pfn_to_page(pfn);
+-		batch = (1 << start_order);
+-		free_order = __free_pages_cma(page, start_order, &count);
+-		pr_debug("pages:%4d, free:%2d, start:%2d, batch:%4d, pfn:%ld\n",
+-			nr_pages, free_order,
+-			start_order, batch, pfn);
+-		nr_pages -= batch;
+-		pfn += batch;
+-		/*
+-		 * since pages are contigunous, and it's buddy already has large
+-		 * order, we can try to free same oder as free_order to get more
+-		 * quickly free speed.
+-		 */
+-		if (free_order < 0) {
+-			start_order = 0;
+-			continue;
+-		}
+-		if (nr_pages >= (1 << free_order)) {
+-			start_order = free_order;
+-		} else {
+-			/* remain pages is not enough */
+-			start_order = 0;
+-			while (nr_pages >= (1 << start_order))
+-				start_order++;
+-			start_order--;
+-		}
++	for (; nr_pages--; pfn++) {
++		struct page *page = pfn_to_page(pfn);
++
++		count += page_count(page) != 1;
++		__free_page(page);
+ 	}
+ 	WARN(count != 0, "%d pages are still in use!\n", count);
+ }
+
+From eab4401f29d1a7948c3727d1008df933827e1268 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:22:46 +0100
+Subject: [PATCH 02/16] Revert "PD#129206: mm: optimize cma allocate time"
+
+This reverts commit e7b40cd104604f9e41f5fc5dcfe3dc33f100de41.
+---
+ drivers/amlogic/amports/vh265.c   |  7 +---
+ drivers/cpufreq/cpufreq_hotplug.c | 10 ------
+ include/linux/mm.h                |  3 --
+ mm/cma.c                          | 23 +-----------
+ mm/migrate.c                      |  2 +-
+ mm/page_alloc.c                   | 76 +++++++++------------------------------
+ mm/page_isolation.c               | 12 ++-----
+ 7 files changed, 22 insertions(+), 111 deletions(-)
+
+diff --git a/drivers/amlogic/amports/vh265.c b/drivers/amlogic/amports/vh265.c
+index 93e46bd50354..03738d0cdf28 100644
+--- a/drivers/amlogic/amports/vh265.c
++++ b/drivers/amlogic/amports/vh265.c
+@@ -1554,8 +1554,6 @@ static void init_buf_list(struct hevc_state_s *hevc)
+ 		}
+ 	}
+ 
+-	pr_info("allocate begin\n");
+-	get_cma_alloc_ref();
+ 	for (i = 0; i < hevc->used_buf_num; i++) {
+ 		if (((i + 1) * buf_size) > hevc->mc_buf->buf_size) {
+ 			if (use_cma)
+@@ -1625,7 +1623,7 @@ static void init_buf_list(struct hevc_state_s *hevc)
+ 					hevc->m_BUF[i].cma_page_count = 0;
+ 					break;
+ 				}
+-				pr_debug("allocate cma buffer[%d] (%d,%ld,%ld)\n",
++				pr_info("allocate cma buffer[%d] (%d,%ld,%ld)\n",
+ 						i,
+ 						hevc->m_BUF[i].cma_page_count,
+ 						hevc->m_BUF[i].alloc_addr,
+@@ -1662,8 +1660,6 @@ static void init_buf_list(struct hevc_state_s *hevc)
+ 				   hevc->m_BUF[i].size);
+ 		}
+ 	}
+-	put_cma_alloc_ref();
+-	pr_info("allocate end\n");
+ 
+ 	hevc->buf_num = i;
+ 
+@@ -5849,7 +5845,6 @@ static int h265_task_handle(void *data)
+ {
+ 	int ret = 0;
+ 	struct hevc_state_s *hevc = (struct hevc_state_s *)data;
+-	set_user_nice(current, -10);
+ 	while (1) {
+ 		if (use_cma == 0) {
+ 			pr_info
+diff --git a/drivers/cpufreq/cpufreq_hotplug.c b/drivers/cpufreq/cpufreq_hotplug.c
+index 0eb99a324fdc..2633faf94baf 100644
+--- a/drivers/cpufreq/cpufreq_hotplug.c
++++ b/drivers/cpufreq/cpufreq_hotplug.c
+@@ -593,14 +593,6 @@ void cpufreq_set_max_cpu_num(unsigned int cpu_num, int cluster_id)
+ 	return;
+ }
+ 
+-static bool can_down(void)
+-{
+-	bool ret = true;
+-#ifdef CONFIG_CMA
+-	ret &= cma_alloc_ref() > 0 ? false : true;
+-#endif
+-	return ret;
+-}
+ 
+ static int __ref cpu_hotplug_thread(void *data)
+ {
+@@ -658,8 +650,6 @@ static int __ref cpu_hotplug_thread(void *data)
+ 		} else if (*hotplug_flag == CPU_HOTPLUG_UNPLUG) {
+ 			*hotplug_flag = CPU_HOTPLUG_NONE;
+ 			cpu_down_num = 0;
+-			if (!can_down())
+-				goto wait_next_hotplug;
+ 			for (i = 0; i < num_online_cpus()-1; i++) {
+ 				raw_spin_lock_irqsave(
+ 					  &NULL_task->pi_lock, flags);
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 8f168e603ee8..df3f883d93c4 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -74,9 +74,6 @@ extern int migrate_status;
+ extern int mutex_status;
+ extern int migrate_refcount;
+ extern wait_queue_head_t migrate_wq;
+-extern int cma_alloc_ref(void);
+-extern void get_cma_alloc_ref(void);
+-extern void put_cma_alloc_ref(void);
+ #endif
+ #include <asm/page.h>
+ #include <asm/pgtable.h>
+diff --git a/mm/cma.c b/mm/cma.c
+index 21ca7d93fc9e..8b3755d9a72c 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -46,25 +46,6 @@ static struct cma cma_areas[MAX_CMA_AREAS];
+ static unsigned cma_area_count;
+ static DEFINE_MUTEX(cma_mutex);
+ 
+-static atomic_t cma_allocate;
+-int cma_alloc_ref(void)
+-{
+-	return atomic_read(&cma_allocate);
+-}
+-EXPORT_SYMBOL(cma_alloc_ref);
+-
+-void get_cma_alloc_ref(void)
+-{
+-	atomic_inc(&cma_allocate);
+-}
+-EXPORT_SYMBOL(get_cma_alloc_ref);
+-
+-void put_cma_alloc_ref(void)
+-{
+-	atomic_dec(&cma_allocate);
+-}
+-EXPORT_SYMBOL(put_cma_alloc_ref);
+-
+ phys_addr_t cma_get_base(struct cma *cma)
+ {
+ 	return PFN_PHYS(cma->base_pfn);
+@@ -156,7 +137,6 @@ static int __init cma_init_reserved_areas(void)
+ 		if (ret)
+ 			return ret;
+ 	}
+-	atomic_set(&cma_allocate, 0);
+ 
+ 	return 0;
+ }
+@@ -342,7 +322,6 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
+ 	if (!count)
+ 		return NULL;
+ 
+-	get_cma_alloc_ref();
+ 	mask = cma_bitmap_aligned_mask(cma, align);
+ 	bitmap_maxno = cma_bitmap_maxno(cma);
+ 	bitmap_count = cma_bitmap_pages_to_bits(cma, count);
+@@ -380,7 +359,7 @@ struct page *cma_alloc(struct cma *cma, int count, unsigned int align)
+ 		/* try again with a bit different memory target */
+ 		start = bitmap_no + mask + 1;
+ 	}
+-	put_cma_alloc_ref();
++
+ 	pr_debug("%s(): returned %p\n", __func__, page);
+ 	return page;
+ }
+diff --git a/mm/migrate.c b/mm/migrate.c
+index 8548732ed9ff..88c86c828269 100644
+--- a/mm/migrate.c
++++ b/mm/migrate.c
+@@ -958,7 +958,7 @@ uncharge:
+ 			add_wait_queue(&migrate_wq, &wait);
+ 			mutex_unlock(&migrate_wait);
+ 
+-			schedule_timeout_interruptible(msecs_to_jiffies(10));
++			schedule_timeout_interruptible(20);
+ 
+ 			mutex_lock(&migrate_wait);
+ 			remove_wait_queue(&migrate_wq, &wait);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index fb4a0323bcc5..5a14d08f8a54 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -221,7 +221,6 @@ int min_free_order_shift = 1;
+  */
+ int extra_free_kbytes = 0;
+ 
+-
+ static unsigned long __meminitdata nr_kernel_pages;
+ static unsigned long __meminitdata nr_all_pages;
+ static unsigned long __meminitdata dma_reserve;
+@@ -973,43 +972,18 @@ static int prep_new_page(struct page *page, unsigned int order, gfp_t gfp_flags)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_CMA
+-static inline bool cma_page(struct page *page)
+-{
+-	int migrate_type = 0;
+-
+-	migrate_type = get_pageblock_migratetype(page);
+-	if (is_migrate_cma(migrate_type) ||
+-	   is_migrate_isolate(migrate_type)) {
+-		return true;
+-	}
+-	return false;
+-}
+-#endif
+-
+-static inline bool is_writeback(gfp_t flags)
+-{
+-	return flags & __GFP_WRITE;
+-}
+-
+ /*
+  * Go through the free lists for the given migratetype and remove
+  * the smallest available page from the freelists
+  */
+ static inline
+ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
+-						int migratetype, gfp_t flags)
++						int migratetype)
+ {
+ 	unsigned int current_order;
+ 	struct free_area *area;
+ 	struct page *page;
+ 
+-#ifdef CONFIG_CMA
+-	/* write back pages should not use CMA */
+-	if (migratetype == MIGRATE_CMA &&
+-		(is_writeback(flags) || cma_alloc_ref()))
+-		return NULL;
+-#endif
+ 	/* Find a page of the appropriate size in the preferred list */
+ 	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
+ 		area = &(zone->free_area[current_order]);
+@@ -1185,8 +1159,7 @@ static void try_to_steal_freepages(struct zone *zone, struct page *page,
+ 
+ /* Remove an element from the buddy allocator from the fallback list */
+ static inline struct page *
+-__rmqueue_fallback(struct zone *zone, unsigned int order,
+-		   int start_migratetype, gfp_t gfp_flag)
++__rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
+ {
+ 	struct free_area *area;
+ 	unsigned int current_order;
+@@ -1209,13 +1182,8 @@ __rmqueue_fallback(struct zone *zone, unsigned int order,
+ 			if (migratetype == MIGRATE_RESERVE)
+ 				break;
+ #ifdef CONFIG_CMA
+-			/* write back pages should not use CMA */
+-			if (migratetype == MIGRATE_CMA) {
+-				if (flags                  ||
+-				    is_writeback(gfp_flag) ||
+-				    cma_alloc_ref())
+-					continue;
+-			}
++			if (flags && migratetype == MIGRATE_CMA)
++				continue;
+ #endif
+ 			area = &(zone->free_area[current_order]);
+ 			if (list_empty(&area->free_list[migratetype]))
+@@ -1273,7 +1241,7 @@ __rmqueue_fallback(struct zone *zone, unsigned int order,
+  * Call me with the zone->lock already held.
+  */
+ static struct page *__rmqueue(struct zone *zone, unsigned int order,
+-						int migratetype, gfp_t gfp_flag)
++						int migratetype)
+ {
+ 	struct page *page;
+ 	int ori_migratetype = migratetype;
+@@ -1298,8 +1266,7 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
+ 				break;
+ 		}
+ 		if (tmp_migratetype == MIGRATE_CMA) {
+-			page = __rmqueue_smallest(zone, order,
+-						  MIGRATE_CMA, gfp_flag);
++			page = __rmqueue_smallest(zone, order, MIGRATE_CMA);
+ 			if (page) {
+ 				ori_migratetype = MIGRATE_CMA;
+ 				goto alloc_page_success;
+@@ -1308,10 +1275,10 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
+ 	}
+ #endif
+ retry_reserve:
+-	page = __rmqueue_smallest(zone, order, ori_migratetype, gfp_flag);
++	page = __rmqueue_smallest(zone, order, ori_migratetype);
+ 
+ 	if (unlikely(!page) && ori_migratetype != MIGRATE_RESERVE) {
+-		page = __rmqueue_fallback(zone, order, migratetype, gfp_flag);
++		page = __rmqueue_fallback(zone, order, migratetype);
+ 
+ 		/*
+ 		 * Use MIGRATE_RESERVE rather than fail an allocation. goto
+@@ -1337,13 +1304,13 @@ alloc_page_success:
+  */
+ static int rmqueue_bulk(struct zone *zone, unsigned int order,
+ 			unsigned long count, struct list_head *list,
+-			int migratetype, bool cold, gfp_t flags)
++			int migratetype, bool cold)
+ {
+ 	int i;
+ 
+ 	spin_lock(&zone->lock);
+ 	for (i = 0; i < count; ++i) {
+-		struct page *page = __rmqueue(zone, order, migratetype, flags);
++		struct page *page = __rmqueue(zone, order, migratetype);
+ 		if (unlikely(page == NULL))
+ 			break;
+ 
+@@ -1709,7 +1676,7 @@ again:
+ #endif
+ 			pcp->count += rmqueue_bulk(zone, 0,
+ 					pcp->batch, list,
+-					migratetype, cold, gfp_flags);
++					migratetype, cold);
+ #ifdef CONFIG_CMA
+ 			if (gfp_flags & __GFP_BDEV)
+ 				migratetype &= (~__GFP_BDEV);
+@@ -1723,15 +1690,11 @@ again:
+ 		else
+ 			page = list_entry(list->next, struct page, lru);
+ #ifdef CONFIG_CMA
+-		/* pcp pages with cma should not used for writeback */
+-		if (gfp_flags & __GFP_BDEV  ||
+-		    is_writeback(gfp_flags) ||
+-		    cma_alloc_ref()) {
++		if (gfp_flags & __GFP_BDEV) {
+ 			if (get_freepage_migratetype(page) == MIGRATE_CMA) {
+ 				spin_lock(&zone->lock);
+ 				migratetype |= __GFP_BDEV;
+-				page = __rmqueue(zone, order,
+-						 migratetype, gfp_flags);
++				page = __rmqueue(zone, order, migratetype);
+ 				migratetype &= (~__GFP_BDEV);
+ 				spin_unlock(&zone->lock);
+ 				if (!page)
+@@ -1743,8 +1706,7 @@ again:
+ 		} else if (migratetype == MIGRATE_MOVABLE) {
+ 			if (get_freepage_migratetype(page) != MIGRATE_CMA) {
+ 				spin_lock(&zone->lock);
+-				tmp_page = __rmqueue(zone, order,
+-						     MIGRATE_CMA, gfp_flags);
++				tmp_page = __rmqueue(zone, order, MIGRATE_CMA);
+ 				spin_unlock(&zone->lock);
+ 				if (!tmp_page)
+ 					goto use_pcp_page;
+@@ -1773,7 +1735,7 @@ use_pcp_page:
+ 			WARN_ON_ONCE(order > 1);
+ 		}
+ 		spin_lock_irqsave(&zone->lock, flags);
+-		page = __rmqueue(zone, order, migratetype, gfp_flags);
++		page = __rmqueue(zone, order, migratetype);
+ 		spin_unlock(&zone->lock);
+ 		if (!page)
+ 			goto failed;
+@@ -3029,12 +2991,6 @@ out:
+ 		goto retry_cpuset;
+ 
+ 	memcg_kmem_commit_charge(page, memcg, order);
+-#ifdef CONFIG_CMA
+-	if (page != NULL && is_writeback(gfp_mask) && cma_page(page)) {
+-		WARN(1, "write back in cma, order:%d, mask:%x, migrate:%d\n",
+-		     order, gfp_mask, get_pageblock_migratetype(page));
+-	}
+-#endif
+ 	return page;
+ }
+ EXPORT_SYMBOL(__alloc_pages_nodemask);
+@@ -6613,7 +6569,7 @@ try_again:
+ 
+ 	/* Make sure the range is really isolated. */
+ 	if (test_pages_isolated(outer_start, end, false)) {
+-		pr_debug("alloc_contig_range test_pages_isolated(%lx, %lx) failed\n",
++		pr_warn("alloc_contig_range test_pages_isolated(%lx, %lx) failed\n",
+ 		       outer_start, end);
+ 		try_times++;
+ 		if (try_times < 10)
+diff --git a/mm/page_isolation.c b/mm/page_isolation.c
+index 48cb2e49cedc..907ab5f6dea5 100644
+--- a/mm/page_isolation.c
++++ b/mm/page_isolation.c
+@@ -219,15 +219,9 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn,
+ 			 */
+ 			pfn++;
+ 			continue;
+-		} else {
+-			pr_debug("%s, page:%ld not isolate, flag:%lx, ",
+-				__func__, pfn, page->flags);
+-			pr_debug("page_cnt:%d, isolate:%d, mapcnt:%d\n",
+-				page_count(page),
+-				get_freepage_migratetype(page),
+-				atomic_read(&page->_mapcount));
+-			return -EBUSY;
+ 		}
++		else
++			return -EBUSY;
+ 	}
+ 	if (pfn < end_pfn)
+ 		return 1;
+@@ -271,7 +265,7 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
+ 			add_wait_queue(&iso_wq, &wait);
+ 			mutex_unlock(&iso_wait);
+ 
+-			schedule_timeout_interruptible(msecs_to_jiffies(10));
++			schedule_timeout_interruptible(20);
+ 
+ 			mutex_lock(&iso_wait);
+ 			remove_wait_queue(&iso_wq, &wait);
+
+From 30d1bf8a374a5be9c02b1dce3fdd1de902b3a345 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:23:04 +0100
+Subject: [PATCH 03/16] Revert "PD#116449: mm: mm optimize for game"
+
+This reverts commit 9c0fdcb7ccbbffb1060a1a0072a3768452e403eb.
+---
+ kernel/fork.c | 77 +++--------------------------------------------------------
+ mm/vmscan.c   |  2 +-
+ 2 files changed, 4 insertions(+), 75 deletions(-)
+
+diff --git a/kernel/fork.c b/kernel/fork.c
+index b143580d71a2..f87117f6cd49 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -146,89 +146,18 @@ void __weak arch_release_thread_info(struct thread_info *ti)
+  * kmemcache based allocator.
+  */
+ # if THREAD_SIZE >= PAGE_SIZE
+-bool stack_mem_create = false;
+-bool stack_mem_create_try = false;
+-struct list_head stack_mem_list;
+-DEFINE_SPINLOCK(stack_lock);
+ static struct thread_info *alloc_thread_info_node(struct task_struct *tsk,
+ 						  int node)
+ {
+-	struct page *page = NULL;
+-#if 1
+-	void *vaddr = NULL;
+-	if (!stack_mem_create_try && !stack_mem_create) {
+-		struct page *tmp_page1 = NULL;
+-		struct page *tmp_page2 = NULL;
+-		int i = 0;
+-		int total = (1 << (MAX_ORDER - 1)) >> THREAD_SIZE_ORDER;
+-
+-		spin_lock_irq(&stack_lock);
+-		INIT_LIST_HEAD(&stack_mem_list);
+-		tmp_page1 = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
+-						 MAX_ORDER - 1);
+-		if (!tmp_page1) {
+-			stack_mem_create_try = true;
+-			spin_unlock_irq(&stack_lock);
+-			page = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
+-						 THREAD_SIZE_ORDER);
+-			goto out;
+-		}
+-		tmp_page2 = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
+-					 MAX_ORDER - 1);
+-		if (!tmp_page2) {
+-			stack_mem_create_try = true;
+-			__free_pages(tmp_page1, MAX_ORDER - 1);
+-			spin_unlock_irq(&stack_lock);
+-			page = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
+-						 THREAD_SIZE_ORDER);
+-			goto out;
+-		}
+-		vaddr = page_address(tmp_page1);
+-		for (i = 0; i < (total << 1); i++) {
+-			list_add((struct list_head *)vaddr, &stack_mem_list);
+-			vaddr += THREAD_SIZE;
+-			if (i == (total - 1))
+-				vaddr = page_address(tmp_page2);
+-		}
+-		stack_mem_create = true;
+-		spin_unlock_irq(&stack_lock);
+-	}
+-	if (stack_mem_create) {
+-		spin_lock_irq(&stack_lock);
+-		if (!list_empty(&stack_mem_list)) {
+-			vaddr = (void *)stack_mem_list.next;
+-			list_del(stack_mem_list.next);
+-			page = phys_to_page(__pa(vaddr));
+-			spin_unlock_irq(&stack_lock);
+-		} else {
+-			spin_unlock_irq(&stack_lock);
+-			page = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
+-						 THREAD_SIZE_ORDER);
+-		}
+-	}
+-out:
+-#else
+-	page = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
+-						 THREAD_SIZE_ORDER);
+-#endif
++	struct page *page = alloc_pages_node(node, THREADINFO_GFP_ACCOUNTED,
++					     THREAD_SIZE_ORDER);
++
+ 	return page ? page_address(page) : NULL;
+ }
+ 
+ static inline void free_thread_info(struct thread_info *ti)
+ {
+-#if 1
+-	struct list_head *list = NULL;
+-
+-	if (ti) {
+-		list = (struct list_head *)(ti);
+-		spin_lock_irq(&stack_lock);
+-		list_add_tail(list, &stack_mem_list);
+-		stack_mem_create = true;
+-		spin_unlock_irq(&stack_lock);
+-	}
+-#else
+ 	free_memcg_kmem_pages((unsigned long)ti, THREAD_SIZE_ORDER);
+-#endif
+ }
+ # else
+ static struct kmem_cache *thread_info_cache;
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 8c8f8ac01a7c..4675f7d86bee 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2129,7 +2129,7 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
+ 	 * There is enough inactive page cache, do not reclaim
+ 	 * anything from the anonymous working set right now.
+ 	 */
+-	if (!inactive_file_is_low(lruvec) && (((file << 1) + file) > anon)) {
++	if (!inactive_file_is_low(lruvec)) {
+ 		scan_balance = SCAN_FILE;
+ 		goto out;
+ 	}
+
+From 4cc5fe8fdd25b6618b9f50b84f9cd62213f313a1 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:23:16 +0100
+Subject: [PATCH 04/16] Revert "PD#108166: mm: modify mm stat for memory size
+ mismatch issue"
+
+This reverts commit 2715d774a03d14aa6ea1a13389cc6aae090f08b7.
+---
+ mm/page_alloc.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 5a14d08f8a54..bc0e37cba28b 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -761,16 +761,14 @@ static void free_one_page(struct zone *zone,
+ 				int migratetype)
+ {
+ 	unsigned long nr_scanned;
+-	int cur_migratetype;
+ 	spin_lock(&zone->lock);
+ 	nr_scanned = zone_page_state(zone, NR_PAGES_SCANNED);
+ 	if (nr_scanned)
+ 		__mod_zone_page_state(zone, NR_PAGES_SCANNED, -nr_scanned);
+ 
+-	cur_migratetype = get_pageblock_migratetype(page);
+-	__free_one_page(page, pfn, zone, order, cur_migratetype);
+-	if (unlikely(!is_migrate_isolate(cur_migratetype)))
+-		__mod_zone_freepage_state(zone, 1 << order, cur_migratetype);
++	__free_one_page(page, pfn, zone, order, migratetype);
++	if (unlikely(!is_migrate_isolate(migratetype)))
++		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+ 	spin_unlock(&zone->lock);
+ }
+ 
+
+From 1819dda0cdd94cb958dfdd55c06ed3cd3ab6b274 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:23:29 +0100
+Subject: [PATCH 05/16] Revert "PD#108166: mm: optimize mm stat"
+
+This reverts commit bb5c2ca1370efa44239052d0562054cb3f5f7922.
+---
+ include/linux/migrate_mode.h |  4 ----
+ include/linux/mm.h           |  3 +--
+ mm/compaction.c              | 12 +++---------
+ mm/internal.h                |  1 -
+ mm/page_alloc.c              | 11 +++--------
+ 5 files changed, 7 insertions(+), 24 deletions(-)
+
+diff --git a/include/linux/migrate_mode.h b/include/linux/migrate_mode.h
+index 6fad78f770b7..ebf3d89a3919 100644
+--- a/include/linux/migrate_mode.h
++++ b/include/linux/migrate_mode.h
+@@ -13,8 +13,4 @@ enum migrate_mode {
+ 	MIGRATE_SYNC,
+ };
+ 
+-enum migrate_type {
+-	COMPACT_NORMAL,
+-	COMPACT_CMA,
+-};
+ #endif		/* MIGRATE_MODE_H_INCLUDED */
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index df3f883d93c4..88ab78c881bd 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -14,7 +14,6 @@
+ #include <linux/atomic.h>
+ #include <linux/debug_locks.h>
+ #include <linux/mm_types.h>
+-#include <linux/migrate_mode.h>
+ #include <linux/range.h>
+ #include <linux/pfn.h>
+ #include <linux/bit_spinlock.h>
+@@ -566,7 +565,7 @@ void put_page(struct page *page);
+ void put_pages_list(struct list_head *pages);
+ 
+ void split_page(struct page *page, unsigned int order);
+-int split_free_page(struct page *page, enum migrate_type page_type);
++int split_free_page(struct page *page);
+ 
+ /*
+  * Compound pages have a destructor function.  Provide a
+diff --git a/mm/compaction.c b/mm/compaction.c
+index a870d1e733d3..9261ef5ac6db 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -277,7 +277,6 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
+ 	unsigned long flags;
+ 	bool locked = false;
+ 	bool checked_pageblock = false;
+-	enum migrate_type page_type = cc->page_type;
+ 
+ 	cursor = pfn_to_page(blockpfn);
+ 
+@@ -325,7 +324,7 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
+ 			goto isolate_fail;
+ 
+ 		/* Found a free page, break it into order-0 pages */
+-		isolated = split_free_page(page, page_type);
++		isolated = split_free_page(page);
+ 		total_isolated += isolated;
+ 		for (i = 0; i < isolated; i++) {
+ 			list_add(&page->lru, freelist);
+@@ -715,7 +714,6 @@ static void isolate_freepages(struct zone *zone,
+ #ifdef CONFIG_CMA
+ 	struct address_space *mapping = NULL;
+ 	bool use_cma = true;
+-	int migrate_type = 0;
+ 
+ 	mapping = page_mapping(migratepage);
+ 	if ((unsigned long)mapping & PAGE_MAPPING_ANON)
+@@ -782,10 +780,9 @@ static void isolate_freepages(struct zone *zone,
+ 			continue;
+ 
+ #ifdef CONFIG_CMA
+-		migrate_type = get_pageblock_migratetype(page);
+-		if (is_migrate_isolate(migrate_type))
++		if (is_migrate_isolate(get_pageblock_migratetype(page)))
+ 			continue;
+-		if (!use_cma && is_migrate_cma(migrate_type))
++		if (!use_cma && is_migrate_cma(get_pageblock_migratetype(page)))
+ 			continue;
+ #endif
+ 		/* Found a block suitable for isolating free pages from */
+@@ -1121,7 +1118,6 @@ static unsigned long compact_zone_order(struct zone *zone, int order,
+ 		.migratetype = allocflags_to_migratetype(gfp_mask),
+ 		.zone = zone,
+ 		.mode = mode,
+-		.page_type = COMPACT_NORMAL,
+ 	};
+ 	INIT_LIST_HEAD(&cc.freepages);
+ 	INIT_LIST_HEAD(&cc.migratepages);
+@@ -1227,7 +1223,6 @@ void compact_pgdat(pg_data_t *pgdat, int order)
+ 	struct compact_control cc = {
+ 		.order = order,
+ 		.mode = MIGRATE_ASYNC,
+-		.page_type = COMPACT_NORMAL,
+ 	};
+ 
+ 	if (!order)
+@@ -1241,7 +1236,6 @@ static void compact_node(int nid)
+ 	struct compact_control cc = {
+ 		.order = -1,
+ 		.mode = MIGRATE_SYNC,
+-		.page_type = COMPACT_NORMAL,
+ 		.ignore_skip_hint = true,
+ 	};
+ 
+diff --git a/mm/internal.h b/mm/internal.h
+index ca491fe66228..1a8a0d4b687a 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -135,7 +135,6 @@ struct compact_control {
+ 	unsigned long free_pfn;		/* isolate_freepages search base */
+ 	unsigned long migrate_pfn;	/* isolate_migratepages search base */
+ 	enum migrate_mode mode;		/* Async or sync migration mode */
+-	enum migrate_type page_type;/* Async or sync migration mode */
+ 	bool ignore_skip_hint;		/* Scan blocks even if marked skip */
+ 	bool finished_update_free;	/* True when the zone cached pfns are
+ 					 * no longer being updated
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index bc0e37cba28b..ab059b89b5b8 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1574,8 +1574,7 @@ void split_page(struct page *page, unsigned int order)
+ }
+ EXPORT_SYMBOL_GPL(split_page);
+ 
+-static int __isolate_free_page(struct page *page, unsigned int order
+-					   , enum migrate_type page_type)
++static int __isolate_free_page(struct page *page, unsigned int order)
+ {
+ 	unsigned long watermark;
+ 	struct zone *zone;
+@@ -1586,9 +1585,6 @@ static int __isolate_free_page(struct page *page, unsigned int order
+ 	zone = page_zone(page);
+ 	mt = get_pageblock_migratetype(page);
+ 
+-	if (page_type == COMPACT_NORMAL)
+-		mt = get_freepage_migratetype(page);
+-
+ 	if (!is_migrate_isolate(mt)) {
+ 		/* Obey watermarks as if the page was being allocated */
+ 		watermark = low_wmark_pages(zone) + (1 << order);
+@@ -1628,14 +1624,14 @@ static int __isolate_free_page(struct page *page, unsigned int order
+  * Note: this is probably too low level an operation for use in drivers.
+  * Please consult with lkml before using this in your driver.
+  */
+-int split_free_page(struct page *page, enum migrate_type page_type)
++int split_free_page(struct page *page)
+ {
+ 	unsigned int order;
+ 	int nr_pages;
+ 
+ 	order = page_order(page);
+ 
+-	nr_pages = __isolate_free_page(page, order, page_type);
++	nr_pages = __isolate_free_page(page, order);
+ 	if (!nr_pages)
+ 		return 0;
+ 
+@@ -6492,7 +6488,6 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 		.order = -1,
+ 		.zone = page_zone(pfn_to_page(start)),
+ 		.mode = MIGRATE_SYNC,
+-		.page_type = COMPACT_CMA,
+ 		.ignore_skip_hint = true,
+ 	};
+ 	INIT_LIST_HEAD(&cc.migratepages);
+
+From e834cadf770d837696d10a5eb5b5197415a4c3fd Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:23:41 +0100
+Subject: [PATCH 06/16] Revert "PD#108166: mm: modify page type usage to
+ prevent competition"
+
+This reverts commit d57ba72165f6f7581ae11c10bf6f8204c791a6a2.
+---
+ include/linux/mm_inline.h | 12 ++++--------
+ include/linux/pagevec.h   |  8 ++------
+ mm/filemap.c              |  7 ++-----
+ mm/readahead.c            |  7 ++-----
+ mm/vmscan.c               | 33 ++++++++++++++-------------------
+ 5 files changed, 24 insertions(+), 43 deletions(-)
+
+diff --git a/include/linux/mm_inline.h b/include/linux/mm_inline.h
+index e0c6722ead8d..13e15fbb8941 100644
+--- a/include/linux/mm_inline.h
++++ b/include/linux/mm_inline.h
+@@ -28,7 +28,6 @@ static __always_inline void add_page_to_lru_list(struct page *page,
+ {
+ 	int nr_pages = hpage_nr_pages(page);
+ 	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-	int migrate_type = 0;
+ 
+ 	mem_cgroup_update_lru_size(lruvec, lru, nr_pages);
+ 	list_add(&page->lru, &lruvec->lists[lru]);
+@@ -36,9 +35,8 @@ static __always_inline void add_page_to_lru_list(struct page *page,
+ 	__mod_zone_page_state(lruvec_zone(lruvec),
+ 			  NR_INACTIVE_ANON_TEST + lru, nr_pages);
+ 
+-	migrate_type = get_pageblock_migratetype(page);
+-	if (is_migrate_cma(migrate_type) ||
+-				is_migrate_isolate(migrate_type))
++	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
++				is_migrate_isolate_page(page))
+ 		__mod_zone_page_state(lruvec_zone(lruvec),
+ 					  NR_LRU_BASE + lru + num, nr_pages);
+ 	else {
+@@ -62,16 +60,14 @@ static __always_inline void del_page_from_lru_list(struct page *page,
+ {
+ 	int nr_pages = hpage_nr_pages(page);
+ 	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-	int migrate_type = 0;
+ 
+ 	mem_cgroup_update_lru_size(lruvec, lru, -nr_pages);
+ 	list_del(&page->lru);
+ 	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru, -nr_pages);
+ 	__mod_zone_page_state(lruvec_zone(lruvec),
+ 				  NR_INACTIVE_ANON_TEST + lru, -nr_pages);
+-	migrate_type = get_pageblock_migratetype(page);
+-	if (is_migrate_cma(migrate_type) ||
+-				is_migrate_isolate(migrate_type))
++	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
++				is_migrate_isolate_page(page))
+ 		__mod_zone_page_state(lruvec_zone(lruvec),
+ 					  NR_LRU_BASE + lru + num, -nr_pages);
+ 	else {
+diff --git a/include/linux/pagevec.h b/include/linux/pagevec.h
+index 961bd5c3b5d8..0c60f88c00f9 100644
+--- a/include/linux/pagevec.h
++++ b/include/linux/pagevec.h
+@@ -61,17 +61,13 @@ static inline unsigned pagevec_space(struct pagevec *pvec)
+ static inline unsigned pagevec_add(struct pagevec *pvec, struct page *page)
+ {
+ 	unsigned ret = 0;
+-#ifdef CONFIG_CMA
+-	int migrate_type = 0;
+-#endif
+ 
+ 	pvec->pages[pvec->nr++] = page;
+ 	ret = pagevec_space(pvec);
+ 
+ #ifdef CONFIG_CMA
+-	migrate_type = get_pageblock_migratetype(page);
+-	if (is_migrate_cma(migrate_type) ||
+-	   is_migrate_isolate(migrate_type)) {
++	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
++	   is_migrate_isolate(get_pageblock_migratetype(page))) {
+ 		ret = 0;
+ 	}
+ #endif
+diff --git a/mm/filemap.c b/mm/filemap.c
+index 6dbef20a220d..38514ee5f6f7 100644
+--- a/mm/filemap.c
++++ b/mm/filemap.c
+@@ -77,11 +77,8 @@ void wakeup_wq(bool has_cma)
+ EXPORT_SYMBOL(wakeup_wq);
+ bool has_cma_page(struct page *page)
+ {
+-	int migrate_type = 0;
+-
+-	migrate_type = get_pageblock_migratetype(page);
+-	if (is_migrate_cma(migrate_type) ||
+-	   is_migrate_isolate(migrate_type)) {
++	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
++	   is_migrate_isolate(get_pageblock_migratetype(page))) {
+ 		migrate_refcount++;
+ 		if (migrate_status != MIGRATE_CMA_ALLOC)
+ 			migrate_status = MIGRATE_CMA_HOLD;
+diff --git a/mm/readahead.c b/mm/readahead.c
+index 09870e8609d8..98638a06c053 100644
+--- a/mm/readahead.c
++++ b/mm/readahead.c
+@@ -164,8 +164,6 @@ int __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+ #ifdef CONFIG_CMA
+ 	bool has_cma = false;
+ #endif
+-	int migrate_type = 0;
+-
+ 	if (isize == 0)
+ 		goto out;
+ 
+@@ -190,10 +188,9 @@ int __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+ 		if (!page)
+ 			break;
+ #ifdef CONFIG_CMA
+-		migrate_type = get_pageblock_migratetype(page);
+ 		if (!has_cma &&
+-			(is_migrate_cma(migrate_type) ||
+-		   is_migrate_isolate(migrate_type))) {
++			(is_migrate_cma(get_pageblock_migratetype(page)) ||
++		   is_migrate_isolate(get_pageblock_migratetype(page)))) {
+ 			if (iso_status != MIGRATE_CMA_ALLOC)
+ 				iso_status = MIGRATE_CMA_HOLD;
+ 			iso_recount++;
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 4675f7d86bee..ebe164b20e65 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1237,15 +1237,15 @@ bool __isolate_cma_ornot(int migrate_type)
+ int __isolate_lru_page(struct page *page, isolate_mode_t mode, int migrate_type)
+ {
+ 	int ret = -EINVAL;
+-	int page_migrate_type = 0;
+ 
+ 	if (!(mode & ISOLATE_UNEVICTABLE)) {
+ #if 1
+ 		if (page) {
+-			page_migrate_type = get_pageblock_migratetype(page);
+ 			if ((!__isolate_cma_ornot(migrate_type)) &&
+-				(is_migrate_cma(page_migrate_type)
+-				 || is_migrate_isolate(page_migrate_type)))
++				(is_migrate_cma(
++					   get_pageblock_migratetype(page))
++				 || is_migrate_isolate(
++					   get_pageblock_migratetype(page))))
+ 				return -EBUSY;
+ 		}
+ #endif
+@@ -1368,7 +1368,6 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 	unsigned long scan;
+ 	bool has_cma = true;
+ 	int num = NR_INACTIVE_ANON_NORMAL - NR_INACTIVE_ANON;
+-	int migrate_type = 0;
+ 
+ 	has_cma = __isolate_cma_ornot(allocflags_to_migratetype(sc->gfp_mask));
+ 	if (!has_cma)
+@@ -1392,9 +1391,8 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 			nr_pages = hpage_nr_pages(page);
+ 			mem_cgroup_update_lru_size(lruvec, lru, -nr_pages);
+ 			list_move(&page->lru, dst);
+-			migrate_type = get_pageblock_migratetype(page);
+-			if (!is_migrate_cma(migrate_type)
+-				&& !is_migrate_isolate(migrate_type)) {
++			if (!is_migrate_cma(get_pageblock_migratetype(page))
++				&& !is_migrate_isolate_page(page)) {
+ 				list_del(&page->lru_normal);
+ 			} else if (page->lru_normal.next != LIST_POISON1
+ 					   && !list_empty(&page->lru_normal)) {
+@@ -1406,17 +1404,16 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 			}
+ 
+ 			nr_taken += nr_pages;
+-			if (is_migrate_cma(migrate_type) ||
+-				is_migrate_isolate(migrate_type))
++			if (is_migrate_cma(get_pageblock_migratetype(page)) ||
++				is_migrate_isolate_page(page))
+ 				nr_cma_taken += nr_pages;
+ 			break;
+ 
+ 		case -EBUSY:
+ 			/* else it is being freed elsewhere */
+ 			list_move(&page->lru, src);
+-			migrate_type = get_pageblock_migratetype(page);
+-			if (!is_migrate_cma(migrate_type)
+-				&& !is_migrate_isolate(migrate_type)) {
++			if (!is_migrate_cma(get_pageblock_migratetype(page))
++				&& !is_migrate_isolate_page(page)) {
+ 				BUG_ON(!PageLRU(page));
+ 				list_move(&page->lru_normal,
+ 						  &lruvec->lists[lru - LRU_BASE
+@@ -1783,7 +1780,6 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
+ 	struct page *page;
+ 	int nr_pages;
+ 	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-	int migrate_type = 0;
+ 
+ 	while (!list_empty(list)) {
+ 		page = lru_to_page(list);
+@@ -1795,9 +1791,8 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
+ 		nr_pages = hpage_nr_pages(page);
+ 		mem_cgroup_update_lru_size(lruvec, lru, nr_pages);
+ 		list_move(&page->lru, &lruvec->lists[lru]);
+-		migrate_type = get_pageblock_migratetype(page);
+-		if (!is_migrate_cma(migrate_type) &&
+-					!is_migrate_isolate(migrate_type)) {
++		if (!is_migrate_cma(get_pageblock_migratetype(page)) &&
++					!is_migrate_isolate_page(page)) {
+ 			if (page->lru_normal.next != LIST_POISON1
+ 					&& !list_empty(&page->lru_normal))
+ 				BUG();
+@@ -1806,8 +1801,8 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
+ 					 LRU_BASE_NORMAL]);
+ 		}
+ 		pgmoved += nr_pages;
+-		if (is_migrate_cma(migrate_type) ||
+-				is_migrate_isolate(migrate_type))
++		if (is_migrate_cma(get_pageblock_migratetype(page)) ||
++				is_migrate_isolate_page(page))
+ 			pgmoved_cma += nr_pages;
+ 
+ 		if (put_page_testzero(page)) {
+
+From deba9a0183cb84552f5e6c8f048885b9465ac539 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:25:39 +0100
+Subject: [PATCH 07/16] Revert "PD#108166: lowmemorykiller: improve the lmk
+ policy"
+
+This reverts commit 4e950f14c553b9de29a147a3c3edaedbdffa5db3.
+---
+ drivers/staging/android/lowmemorykiller.c | 37 +++++++++----------------------
+ 1 file changed, 11 insertions(+), 26 deletions(-)
+
+diff --git a/drivers/staging/android/lowmemorykiller.c b/drivers/staging/android/lowmemorykiller.c
+index 65615f074e17..16671f6d05d3 100644
+--- a/drivers/staging/android/lowmemorykiller.c
++++ b/drivers/staging/android/lowmemorykiller.c
+@@ -59,7 +59,6 @@ static int lowmem_minfree[6] = {
+ 	16 * 1024,	/* 64MB */
+ };
+ static int lowmem_minfree_size = 4;
+-static uint reserve_minfree = 8192;
+ 
+ static unsigned long lowmem_deathpending_timeout;
+ 
+@@ -93,32 +92,27 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
+ 	int other_free = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
+ 	int other_file = global_page_state(NR_FILE_PAGES) -
+ 						global_page_state(NR_SHMEM);
+-	int nomove_free = 0;
+-	int nomove_file = 0;
+ 	int file_cma = 0;
+ 	struct zone *zone = NULL;
+ 
++	if (lowmem_adj_size < array_size)
++		array_size = lowmem_adj_size;
++	if (lowmem_minfree_size < array_size)
++		array_size = lowmem_minfree_size;
+ 	if (IS_ENABLED(CONFIG_CMA)
+ 		&& (allocflags_to_migratetype(sc->gfp_mask)
+-					!= MIGRATE_MOVABLE)) {
+-		nomove_free = global_page_state(NR_FREE_PAGES) -
+-					global_page_state(NR_FREE_CMA_PAGES);
+-		nomove_file = other_file;
++			!= MIGRATE_MOVABLE)) {
++		other_free -= global_page_state(NR_FREE_CMA_PAGES);
+ 		for_each_zone(zone) {
+ 			if (zone->managed_pages == 0)
+ 				continue;
+ 			spin_lock_irq(&zone->lru_lock);
+-			file_cma = zone_page_state(zone, NR_INACTIVE_FILE_CMA) +
+-				zone_page_state(zone, NR_ACTIVE_FILE_CMA);
++			file_cma = zone_page_state(zone, NR_INACTIVE_FILE_CMA)
++				+ zone_page_state(zone, NR_ACTIVE_FILE_CMA);
+ 			spin_unlock_irq(&zone->lru_lock);
+-			nomove_file = nomove_file - file_cma;
++			other_file = other_file - file_cma;
+ 		}
+ 	}
+-
+-	if (lowmem_adj_size < array_size)
+-		array_size = lowmem_adj_size;
+-	if (lowmem_minfree_size < array_size)
+-		array_size = lowmem_minfree_size;
+ 	for (i = 0; i < array_size; i++) {
+ 		minfree = lowmem_minfree[i];
+ 		if (other_free < minfree && other_file < minfree) {
+@@ -127,12 +121,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
+ 		}
+ 	}
+ 
+-	if ((nomove_file + nomove_free) > 0
+-		&& (nomove_file + nomove_free) < reserve_minfree) {
+-		/* set to forground, for we really need to kill */
+-		min_score_adj = lowmem_adj[0];
+-	}
+-
+ 	lowmem_print(3, "lowmem_scan %lu, %x, ofree %d %d, ma %hd\n",
+ 			sc->nr_to_scan, sc->gfp_mask, other_free,
+ 			other_file, min_score_adj);
+@@ -193,16 +181,14 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
+ 		lowmem_print(1, "Killing '%s' (%d), adj %hd,\n" \
+ 				"   to free %ldkB on behalf of '%s' (%d) because\n" \
+ 				"   cache %ldkB is below limit %ldkB for oom_score_adj %hd\n" \
+-				"   Free memory is %ldkB above reserved. nonmove free (%ldkB),(%ldkB)\n",
++				"   Free memory is %ldkB above reserved\n",
+ 			     selected->comm, selected->pid,
+ 			     selected_oom_score_adj,
+ 			     selected_tasksize * (long)(PAGE_SIZE / 1024),
+ 			     current->comm, current->pid,
+ 			     cache_size, cache_limit,
+ 			     min_score_adj,
+-			     free,
+-			     nomove_free * (long)(PAGE_SIZE / 1024),
+-			     nomove_file * (long)(PAGE_SIZE / 1024));
++			     free);
+ 		lowmem_deathpending_timeout = jiffies + HZ;
+ 		send_sig(SIGKILL, selected, 0);
+ 		set_tsk_thread_flag(selected, TIF_MEMDIE);
+@@ -323,7 +309,6 @@ module_param_array_named(adj, lowmem_adj, short, &lowmem_adj_size,
+ module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
+ 			 S_IRUGO | S_IWUSR);
+ module_param_named(debug_level, lowmem_debug_level, uint, S_IRUGO | S_IWUSR);
+-module_param(reserve_minfree, uint, S_IRUGO | S_IWUSR);
+ 
+ module_init(lowmem_init);
+ module_exit(lowmem_exit);
+
+From f42ef18b30927c0002787abc6be631e662b67b98 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:28:48 +0100
+Subject: [PATCH 08/16] Revert "PD#108166: mm: page type optimization"
+
+This reverts commit b00a69f42c6c08809423509f47d21a6d8ce049a0.
+---
+ arch/arm64/Kconfig                        |  2 +-
+ arch/arm64/mm/init.c                      |  6 ++----
+ drivers/amlogic/amports/amvdec.c          |  6 +++---
+ drivers/staging/android/lowmemorykiller.c | 16 ----------------
+ mm/page_alloc.c                           | 16 ++++++++--------
+ 5 files changed, 14 insertions(+), 32 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 73dc95473a5a..3e690525c7e5 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -138,7 +138,7 @@ config GENERIC_CALIBRATE_DELAY
+ 	def_bool y
+ 
+ config ZONE_DMA
+-	bool
++	def_bool y
+ 
+ config ARCH_DMA_ADDR_T_64BIT
+ 	def_bool y
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index a16cd032b777..28b8f7abd7fe 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -149,14 +149,12 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ 	memset(zone_size, 0, sizeof(zone_size));
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+-#ifdef CONFIG_ZONE_DMA
+ 	if (IS_ENABLED(CONFIG_ZONE_DMA)) {
+ 		unsigned long max_dma_phys =
+ 			(unsigned long)dma_to_phys(NULL, DMA_BIT_MASK(32) + 1);
+ 		max_dma = max(min, min(max, max_dma_phys >> PAGE_SHIFT));
+ 		zone_size[ZONE_DMA] = max_dma - min;
+ 	}
+-#endif
+ 	zone_size[ZONE_NORMAL] = max - max_dma;
+ 
+ 	memcpy(zhole_size, zone_size, sizeof(zhole_size));
+@@ -167,12 +165,12 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ 
+ 		if (start >= max)
+ 			continue;
+-#ifdef CONFIG_ZONE_DMA
++
+ 		if (IS_ENABLED(CONFIG_ZONE_DMA) && start < max_dma) {
+ 			unsigned long dma_end = min(end, max_dma);
+ 			zhole_size[ZONE_DMA] -= dma_end - start;
+ 		}
+-#endif
++
+ 		if (end > max_dma) {
+ 			unsigned long normal_end = min(end, max);
+ 			unsigned long normal_start = max(start, max_dma);
+diff --git a/drivers/amlogic/amports/amvdec.c b/drivers/amlogic/amports/amvdec.c
+index 8ec2ce7313ba..a4a41d0b24b1 100644
+--- a/drivers/amlogic/amports/amvdec.c
++++ b/drivers/amlogic/amports/amvdec.c
+@@ -243,7 +243,7 @@ int amvdec_wake_unlock(void)
+ static s32 am_loadmc_ex(enum vformat_e type,
+ 		const char *name, char *def, s32(*load)(const u32 *))
+ {
+-	char *mc_addr = vmalloc(4096 * 4);
++	char *mc_addr = kmalloc(4096 * 4, GFP_KERNEL);
+ 	char *pmc_addr = def;
+ 	int err;
+ 
+@@ -255,7 +255,7 @@ static s32 am_loadmc_ex(enum vformat_e type,
+ 			pmc_addr = mc_addr;
+ 	}
+ 	if (!pmc_addr) {
+-		vfree(mc_addr);
++		kfree(mc_addr);
+ 		return -1;
+ 	}
+ 	err = (*load)((u32 *) pmc_addr);
+@@ -263,7 +263,7 @@ static s32 am_loadmc_ex(enum vformat_e type,
+ 		pr_err("loading firmware %s to vdec ram  failed!\n", name);
+ 		return err;
+ 	}
+-	vfree(mc_addr);
++	kfree(mc_addr);
+ 	pr_debug("loading firmware %s to vdec ram  ok!\n", name);
+ 	return err;
+ }
+diff --git a/drivers/staging/android/lowmemorykiller.c b/drivers/staging/android/lowmemorykiller.c
+index 16671f6d05d3..a230f3d49961 100644
+--- a/drivers/staging/android/lowmemorykiller.c
++++ b/drivers/staging/android/lowmemorykiller.c
+@@ -92,27 +92,11 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
+ 	int other_free = global_page_state(NR_FREE_PAGES) - totalreserve_pages;
+ 	int other_file = global_page_state(NR_FILE_PAGES) -
+ 						global_page_state(NR_SHMEM);
+-	int file_cma = 0;
+-	struct zone *zone = NULL;
+ 
+ 	if (lowmem_adj_size < array_size)
+ 		array_size = lowmem_adj_size;
+ 	if (lowmem_minfree_size < array_size)
+ 		array_size = lowmem_minfree_size;
+-	if (IS_ENABLED(CONFIG_CMA)
+-		&& (allocflags_to_migratetype(sc->gfp_mask)
+-			!= MIGRATE_MOVABLE)) {
+-		other_free -= global_page_state(NR_FREE_CMA_PAGES);
+-		for_each_zone(zone) {
+-			if (zone->managed_pages == 0)
+-				continue;
+-			spin_lock_irq(&zone->lru_lock);
+-			file_cma = zone_page_state(zone, NR_INACTIVE_FILE_CMA)
+-				+ zone_page_state(zone, NR_ACTIVE_FILE_CMA);
+-			spin_unlock_irq(&zone->lru_lock);
+-			other_file = other_file - file_cma;
+-		}
+-	}
+ 	for (i = 0; i < array_size; i++) {
+ 		minfree = lowmem_minfree[i];
+ 		if (other_free < minfree && other_file < minfree) {
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index ab059b89b5b8..ff67c73a182b 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -741,7 +741,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+ 			page = list_entry(list->prev, struct page, lru);
+ 			/* must delete as __free_one_page list manipulates */
+ 			list_del(&page->lru);
+-			mt = get_freepage_migratetype(page);
++			mt = get_pageblock_migratetype(page);
+ 			/* MIGRATE_MOVABLE list may include MIGRATE_RESERVEs */
+ 			__free_one_page(page, page_to_pfn(page), zone, 0, mt);
+ 			trace_mm_page_pcpu_drain(page, 0, mt);
+@@ -1685,7 +1685,7 @@ again:
+ 			page = list_entry(list->next, struct page, lru);
+ #ifdef CONFIG_CMA
+ 		if (gfp_flags & __GFP_BDEV) {
+-			if (get_freepage_migratetype(page) == MIGRATE_CMA) {
++			if (get_pageblock_migratetype(page) == MIGRATE_CMA) {
+ 				spin_lock(&zone->lock);
+ 				migratetype |= __GFP_BDEV;
+ 				page = __rmqueue(zone, order, migratetype);
+@@ -1694,11 +1694,11 @@ again:
+ 				if (!page)
+ 					goto failed;
+ 				__mod_zone_freepage_state(zone, -(1 << order),
+-					  get_freepage_migratetype(page));
++					  get_pageblock_migratetype(page));
+ 				goto alloc_sucess;
+ 			}
+ 		} else if (migratetype == MIGRATE_MOVABLE) {
+-			if (get_freepage_migratetype(page) != MIGRATE_CMA) {
++			if (get_pageblock_migratetype(page) != MIGRATE_CMA) {
+ 				spin_lock(&zone->lock);
+ 				tmp_page = __rmqueue(zone, order, MIGRATE_CMA);
+ 				spin_unlock(&zone->lock);
+@@ -1706,7 +1706,7 @@ again:
+ 					goto use_pcp_page;
+ 				page = tmp_page;
+ 				__mod_zone_freepage_state(zone, -(1 << order),
+-					  get_freepage_migratetype(page));
++					  get_pageblock_migratetype(page));
+ 				goto alloc_sucess;
+ 			}
+ 		}
+@@ -1734,7 +1734,7 @@ use_pcp_page:
+ 		if (!page)
+ 			goto failed;
+ 		__mod_zone_freepage_state(zone, -(1 << order),
+-					  get_freepage_migratetype(page));
++					  get_pageblock_migratetype(page));
+ 	}
+ #ifdef CONFIG_CMA
+ alloc_sucess:
+@@ -3337,8 +3337,7 @@ void show_free_areas(unsigned int filter)
+ 		global_page_state(NR_SHMEM),
+ 		global_page_state(NR_PAGETABLE),
+ 		global_page_state(NR_BOUNCE),
+-		global_page_state(NR_FREE_CMA_PAGES)
+-		);
++		global_page_state(NR_FREE_CMA_PAGES));
+ 
+ 	for_each_populated_zone(zone) {
+ 		int i;
+@@ -3429,6 +3428,7 @@ void show_free_areas(unsigned int filter)
+ 
+ 			nr[order] = area->nr_free;
+ 			total += nr[order] << order;
++
+ 			types[order] = 0;
+ 			for (type = 0; type < MIGRATE_TYPES; type++) {
+ 				if (!list_empty(&area->free_list[type]))
+
+From 18ec4058aa45f98d6efb54c4dcb831fa2eab64db Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:29:08 +0100
+Subject: [PATCH 09/16] Revert "PD#111054: mm: lru list optimization"
+
+This reverts commit fa55c115839d3e758ef7dd76e75018b20880b0d1.
+---
+ arch/arm64/include/asm/thread_info.h          |   4 +-
+ drivers/staging/android/ion/ion_system_heap.c |   5 +-
+ include/linux/mm_inline.h                     |  38 ------
+ include/linux/mm_types.h                      |   1 -
+ include/linux/mmzone.h                        |  31 +----
+ include/linux/swap.h                          |   3 +-
+ mm/compaction.c                               |   2 +-
+ mm/mmzone.c                                   |   2 -
+ mm/page_alloc.c                               |   1 -
+ mm/vmscan.c                                   | 179 ++++----------------------
+ 10 files changed, 32 insertions(+), 234 deletions(-)
+
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 79ddbf814346..3d8febecf6ed 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -24,10 +24,10 @@
+ #include <linux/compiler.h>
+ 
+ #ifndef CONFIG_ARM64_64K_PAGES
+-#define THREAD_SIZE_ORDER  2
++#define THREAD_SIZE_ORDER  1
+ #endif
+ 
+-#define THREAD_SIZE	 16384
++#define THREAD_SIZE	 8192
+ #define THREAD_START_SP		(THREAD_SIZE - 16)
+ 
+ #ifndef __ASSEMBLY__
+diff --git a/drivers/staging/android/ion/ion_system_heap.c b/drivers/staging/android/ion/ion_system_heap.c
+index 6f0fb8c6934c..326d2af34339 100644
+--- a/drivers/staging/android/ion/ion_system_heap.c
++++ b/drivers/staging/android/ion/ion_system_heap.c
+@@ -70,7 +70,7 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
+ 	} else {
+ 		gfp_t gfp_flags = low_order_gfp_flags;
+ 
+-		if (order > 0)
++		if (((totalram_pages < 0x20000) && (order > 0)) || (order > 1))
+ 			gfp_flags = high_order_gfp_flags;
+ 		page = alloc_pages(gfp_flags, order);
+ 		if (!page)
+@@ -301,7 +301,8 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *unused)
+ 		struct ion_page_pool *pool;
+ 		gfp_t gfp_flags = low_order_gfp_flags;
+ 
+-		if (orders[i] > 0)
++		if (((totalram_pages < 0x20000) && (orders[i] > 0))
++			|| orders[i] > 1)
+ 			gfp_flags = high_order_gfp_flags;
+ 		pool = ion_page_pool_create(gfp_flags, orders[i]);
+ 		if (!pool)
+diff --git a/include/linux/mm_inline.h b/include/linux/mm_inline.h
+index 13e15fbb8941..cf55945c83fb 100644
+--- a/include/linux/mm_inline.h
++++ b/include/linux/mm_inline.h
+@@ -3,7 +3,6 @@
+ 
+ #include <linux/huge_mm.h>
+ #include <linux/swap.h>
+-#include <linux/page-isolation.h>
+ 
+ /**
+  * page_is_file_cache - should the page be on a file LRU or anon LRU?
+@@ -27,55 +26,18 @@ static __always_inline void add_page_to_lru_list(struct page *page,
+ 				struct lruvec *lruvec, enum lru_list lru)
+ {
+ 	int nr_pages = hpage_nr_pages(page);
+-	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-
+ 	mem_cgroup_update_lru_size(lruvec, lru, nr_pages);
+ 	list_add(&page->lru, &lruvec->lists[lru]);
+ 	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru, nr_pages);
+-	__mod_zone_page_state(lruvec_zone(lruvec),
+-			  NR_INACTIVE_ANON_TEST + lru, nr_pages);
+-
+-	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
+-				is_migrate_isolate_page(page))
+-		__mod_zone_page_state(lruvec_zone(lruvec),
+-					  NR_LRU_BASE + lru + num, nr_pages);
+-	else {
+-		num = NR_INACTIVE_ANON_NORMAL - NR_INACTIVE_ANON;
+-		if (page->lru_normal.next != LIST_POISON1
+-			&& !list_empty(&page->lru_normal)) {
+-			pr_err("-----------------%s %d, %p\n",
+-				   __func__, __LINE__, page->lru_normal.next);
+-			BUG();
+-		}
+-		BUG_ON(!PageLRU(page));
+-		list_add(&page->lru_normal,
+-			 &lruvec->lists[lru - LRU_BASE + LRU_BASE_NORMAL]);
+-		__mod_zone_page_state(lruvec_zone(lruvec),
+-					  NR_LRU_BASE + lru + num, nr_pages);
+-	}
+ }
+ 
+ static __always_inline void del_page_from_lru_list(struct page *page,
+ 				struct lruvec *lruvec, enum lru_list lru)
+ {
+ 	int nr_pages = hpage_nr_pages(page);
+-	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-
+ 	mem_cgroup_update_lru_size(lruvec, lru, -nr_pages);
+ 	list_del(&page->lru);
+ 	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru, -nr_pages);
+-	__mod_zone_page_state(lruvec_zone(lruvec),
+-				  NR_INACTIVE_ANON_TEST + lru, -nr_pages);
+-	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
+-				is_migrate_isolate_page(page))
+-		__mod_zone_page_state(lruvec_zone(lruvec),
+-					  NR_LRU_BASE + lru + num, -nr_pages);
+-	else {
+-		num = NR_INACTIVE_ANON_NORMAL - NR_INACTIVE_ANON;
+-		list_del(&page->lru_normal);
+-		__mod_zone_page_state(lruvec_zone(lruvec),
+-					  NR_LRU_BASE + lru + num, -nr_pages);
+-	}
+ }
+ 
+ /**
+diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+index 0525bfc975d7..6c2b3873678e 100644
+--- a/include/linux/mm_types.h
++++ b/include/linux/mm_types.h
+@@ -145,7 +145,6 @@ struct page {
+ 		pgtable_t pmd_huge_pte; /* protected by page->ptl */
+ #endif
+ 	};
+-	struct list_head lru_normal;
+ 
+ 	/* Remainder is not double word aligned */
+ 	union {
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index fd4d63692def..2fa9a28a2920 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -156,21 +156,6 @@ enum zone_stat_item {
+ #endif
+ 	NR_ANON_TRANSPARENT_HUGEPAGES,
+ 	NR_FREE_CMA_PAGES,
+-	NR_INACTIVE_ANON_CMA,	/* must match order of LRU_[IN]ACTIVE */
+-	NR_ACTIVE_ANON_CMA,		/*  "     "     "   "       "         */
+-	NR_INACTIVE_FILE_CMA,	/*  "     "     "   "       "         */
+-	NR_ACTIVE_FILE_CMA,		/*  "     "     "   "       "         */
+-	NR_UNEVICTABLE_FILE_CMA,		/*  "   "   "       "         */
+-	NR_INACTIVE_ANON_NORMAL,	/* must match order of LRU_[IN]ACTIVE */
+-	NR_ACTIVE_ANON_NORMAL,		/*  "     "     "   "       "         */
+-	NR_INACTIVE_FILE_NORMAL,	/*  "     "     "   "       "         */
+-	NR_ACTIVE_FILE_NORMAL,		/*  "     "     "   "       "         */
+-	NR_UNEVICTABLE_FILE_NORMAL,		/*  "   "   "       "         */
+-	NR_INACTIVE_ANON_TEST,	/* must match order of LRU_[IN]ACTIVE */
+-	NR_ACTIVE_ANON_TEST,		/*  "     "     "   "       "         */
+-	NR_INACTIVE_FILE_TEST,	/*  "     "     "   "       "         */
+-	NR_ACTIVE_FILE_TEST,		/*  "     "     "   "       "         */
+-	NR_UNEVICTABLE_FILE_TEST,		/*  " "       "         */
+ 	NR_VM_ZONE_STAT_ITEMS };
+ 
+ /*
+@@ -192,21 +177,11 @@ enum lru_list {
+ 	LRU_INACTIVE_FILE = LRU_BASE + LRU_FILE,
+ 	LRU_ACTIVE_FILE = LRU_BASE + LRU_FILE + LRU_ACTIVE,
+ 	LRU_UNEVICTABLE,
+-	NR_LRU_LISTS,
+-	LRU_BASE_NORMAL = NR_LRU_LISTS,
+-	LRU_INACTIVE_ANON_NORMAL = LRU_BASE_NORMAL + LRU_BASE,
+-	LRU_ACTIVE_ANON_NORMAL = LRU_BASE_NORMAL + LRU_BASE + LRU_ACTIVE,
+-	LRU_INACTIVE_FILE_NORMAL = LRU_BASE_NORMAL + LRU_BASE + LRU_FILE,
+-	LRU_ACTIVE_FILE_NORMAL = LRU_BASE_NORMAL
+-		+ LRU_BASE + LRU_FILE
+-		+ LRU_ACTIVE,
+-	LRU_UNEVICTABLE_NORMAL,
+-	NR_LRU_TOTAL_LISTS
++	NR_LRU_LISTS
+ };
+ 
+ #define for_each_lru(lru) for (lru = 0; lru < NR_LRU_LISTS; lru++)
+-#define for_each_lru_normal(lru) \
+-	for (lru = LRU_INACTIVE_ANON_NORMAL; lru < NR_LRU_TOTAL_LISTS; lru++)
++
+ #define for_each_evictable_lru(lru) for (lru = 0; lru <= LRU_ACTIVE_FILE; lru++)
+ 
+ static inline int is_file_lru(enum lru_list lru)
+@@ -238,7 +213,7 @@ struct zone_reclaim_stat {
+ };
+ 
+ struct lruvec {
+-	struct list_head lists[NR_LRU_TOTAL_LISTS];
++	struct list_head lists[NR_LRU_LISTS];
+ 	struct zone_reclaim_stat reclaim_stat;
+ #ifdef CONFIG_MEMCG
+ 	struct zone *zone;
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index 2fc5f06dcc7d..eb2fc17295db 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -288,8 +288,7 @@ extern void add_page_to_unevictable_list(struct page *page);
+ /* linux/mm/vmscan.c */
+ extern unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
+ 					gfp_t gfp_mask, nodemask_t *mask);
+-extern int
+-__isolate_lru_page(struct page *page, isolate_mode_t mode, int migrate_type);
++extern int __isolate_lru_page(struct page *page, isolate_mode_t mode);
+ extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *mem,
+ 						  gfp_t gfp_mask, bool noswap);
+ extern unsigned long mem_cgroup_shrink_node_zone(struct mem_cgroup *mem,
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 9261ef5ac6db..0bdc26173bde 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -648,7 +648,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
+ 		lruvec = mem_cgroup_page_lruvec(page, zone);
+ 
+ 		/* Try isolate the page */
+-		if (__isolate_lru_page(page, mode, cc->migratetype) != 0)
++		if (__isolate_lru_page(page, mode) != 0)
+ 			continue;
+ 
+ 		VM_BUG_ON_PAGE(PageTransCompound(page), page);
+diff --git a/mm/mmzone.c b/mm/mmzone.c
+index 360b65f315b6..bf34fb8556db 100644
+--- a/mm/mmzone.c
++++ b/mm/mmzone.c
+@@ -95,8 +95,6 @@ void lruvec_init(struct lruvec *lruvec)
+ 
+ 	for_each_lru(lru)
+ 		INIT_LIST_HEAD(&lruvec->lists[lru]);
+-	for_each_lru_normal(lru)
+-		INIT_LIST_HEAD(&lruvec->lists[lru]);
+ }
+ 
+ #if defined(CONFIG_NUMA_BALANCING) && !defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS)
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index ff67c73a182b..59a8c856d452 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -4286,7 +4286,6 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
+ 			set_pageblock_migratetype(page, MIGRATE_MOVABLE);
+ 
+ 		INIT_LIST_HEAD(&page->lru);
+-		INIT_LIST_HEAD(&page->lru_normal);
+ #ifdef WANT_PAGE_VIRTUAL
+ 		/* The shift won't overflow because ZONE_NORMAL is below 4G. */
+ 		if (!is_highmem_idx(zone))
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index ebe164b20e65..74f149c33490 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -99,8 +99,6 @@ struct scan_control {
+ };
+ 
+ #define lru_to_page(_head) (list_entry((_head)->prev, struct page, lru))
+-#define lru_normal_to_page(_head) \
+-	(list_entry((_head)->prev, struct page, lru_normal))
+ 
+ #ifdef ARCH_HAS_PREFETCH
+ #define prefetch_prev_lru_page(_page, _base, _field)			\
+@@ -178,26 +176,6 @@ static unsigned long get_lru_size(struct lruvec *lruvec, enum lru_list lru)
+ 
+ 	return zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru);
+ }
+-static unsigned long
+-get_lru_cma_size(struct lruvec *lruvec, enum lru_list lru)
+-{
+-	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-
+-	return zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru + num);
+-}
+-static unsigned long
+-get_lru_normal_size(struct lruvec *lruvec, enum lru_list lru)
+-{
+-	int num = NR_INACTIVE_ANON_NORMAL - NR_INACTIVE_ANON;
+-
+-	return zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru + num);
+-}
+-static unsigned long get_lru_test_size(struct lruvec *lruvec, enum lru_list lru)
+-{
+-	int num = NR_INACTIVE_ANON_TEST - NR_INACTIVE_ANON;
+-
+-	return zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru + num);
+-}
+ 
+ struct dentry *debug_file;
+ 
+@@ -1209,21 +1187,7 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
+ 	mod_zone_page_state(zone, NR_ISOLATED_FILE, -ret);
+ 	return ret;
+ }
+-bool __isolate_cma_ornot(int migrate_type)
+-{
+-	unsigned long free_cma = 0, total_free = 0;
+-
+-/*	if (migrate_type != MIGRATE_MOVABLE) { */
+-		free_cma = global_page_state(NR_FREE_CMA_PAGES);
+-		free_cma += free_cma << 1;
+-		total_free = global_page_state(NR_FREE_PAGES);
+ 
+-		if (free_cma > total_free)
+-			return false;
+-/*	} */
+-
+-	return true;
+-}
+ /*
+  * Attempt to remove the specified page from its LRU.  Only take this page
+  * if it is of the appropriate PageActive status.  Pages which are being
+@@ -1234,19 +1198,23 @@ bool __isolate_cma_ornot(int migrate_type)
+  *
+  * returns 0 on success, -ve errno on failure.
+  */
+-int __isolate_lru_page(struct page *page, isolate_mode_t mode, int migrate_type)
++int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+ {
+ 	int ret = -EINVAL;
++	unsigned long free_cma = 0, total_free = 0;
+ 
+ 	if (!(mode & ISOLATE_UNEVICTABLE)) {
+ #if 1
++		free_cma = global_page_state(NR_FREE_CMA_PAGES);
++		free_cma += free_cma << 1;
++		total_free = global_page_state(NR_FREE_PAGES);
+ 		if (page) {
+-			if ((!__isolate_cma_ornot(migrate_type)) &&
++			if ((free_cma > total_free) &&
+ 				(is_migrate_cma(
+ 					   get_pageblock_migratetype(page))
+ 				 || is_migrate_isolate(
+ 					   get_pageblock_migratetype(page))))
+-				return -EBUSY;
++				return ret;
+ 		}
+ #endif
+ 	}
+@@ -1311,32 +1279,6 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode, int migrate_type)
+ 	return ret;
+ }
+ 
+-unsigned long print_lru_info(struct lruvec *lruvec)
+-{
+-		pr_warn("-----%s %d, free:%lu, free cma:%lu, lru:%lu %lu %lu %lu, lru cma:%lu %lu %lu %lu, normal:%lu %lu %lu %lu, test:%lu %lu %lu %lu\n",
+-				   __func__, __LINE__,
+-		   global_page_state(NR_FREE_PAGES),
+-		   global_page_state(NR_FREE_CMA_PAGES),
+-		   get_lru_size(lruvec, 0),
+-		   get_lru_size(lruvec, 1),
+-		   get_lru_size(lruvec, 2),
+-		   get_lru_size(lruvec, 3),
+-		   get_lru_cma_size(lruvec, 0),
+-		   get_lru_cma_size(lruvec, 1),
+-		   get_lru_cma_size(lruvec, 2),
+-		   get_lru_cma_size(lruvec, 3),
+-		   get_lru_normal_size(lruvec, 0),
+-		   get_lru_normal_size(lruvec, 1),
+-		   get_lru_normal_size(lruvec, 2),
+-		   get_lru_normal_size(lruvec, 3),
+-		   get_lru_test_size(lruvec, 0),
+-		   get_lru_test_size(lruvec, 1),
+-		   get_lru_test_size(lruvec, 2),
+-		   get_lru_test_size(lruvec, 3));
+-
+-	return 1;
+-}
+-EXPORT_SYMBOL(print_lru_info);
+ /*
+  * zone->lru_lock is heavily contended.  Some of the functions that
+  * shrink the lists perform better by taking out a batch of pages
+@@ -1364,89 +1306,45 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ {
+ 	struct list_head *src = &lruvec->lists[lru];
+ 	struct list_head *src_head = src;
+-	unsigned long nr_taken = 0, nr_cma_taken = 0;
++	unsigned long nr_taken = 0;
+ 	unsigned long scan;
+-	bool has_cma = true;
+-	int num = NR_INACTIVE_ANON_NORMAL - NR_INACTIVE_ANON;
+-
+-	has_cma = __isolate_cma_ornot(allocflags_to_migratetype(sc->gfp_mask));
+-	if (!has_cma)
+-		src_head = &lruvec->lists[lru - LRU_BASE + LRU_BASE_NORMAL];
+ 
+-	for (scan = 0; scan < nr_to_scan && !list_empty(src_head); scan++) {
++	for (scan = 0; scan < nr_to_scan && !list_empty(src); scan++) {
+ 		struct page *page;
+ 		int nr_pages;
+ 
+-		if (has_cma)
+-			page = lru_to_page(src);
+-		else
+-			page = lru_normal_to_page(src_head);
++		if (src->prev == src_head)
++			goto isolate_finish;
++
++		page = lru_to_page(src);
+ 		prefetchw_prev_lru_page(page, src, flags);
+ 
+ 		VM_BUG_ON_PAGE(!PageLRU(page), page);
+ 
+-		switch (__isolate_lru_page(page, mode,
+-				   allocflags_to_migratetype(sc->gfp_mask))) {
++		switch (__isolate_lru_page(page, mode)) {
+ 		case 0:
+ 			nr_pages = hpage_nr_pages(page);
+ 			mem_cgroup_update_lru_size(lruvec, lru, -nr_pages);
+ 			list_move(&page->lru, dst);
+-			if (!is_migrate_cma(get_pageblock_migratetype(page))
+-				&& !is_migrate_isolate_page(page)) {
+-				list_del(&page->lru_normal);
+-			} else if (page->lru_normal.next != LIST_POISON1
+-					   && !list_empty(&page->lru_normal)) {
+-				pr_err("-----%s %d, %d, %p\n",
+-					   __func__, __LINE__,
+-					   get_pageblock_migratetype(page),
+-					   page->lru_normal.next);
+-				BUG();
+-			}
+-
+ 			nr_taken += nr_pages;
+-			if (is_migrate_cma(get_pageblock_migratetype(page)) ||
+-				is_migrate_isolate_page(page))
+-				nr_cma_taken += nr_pages;
+ 			break;
+ 
+ 		case -EBUSY:
+ 			/* else it is being freed elsewhere */
+ 			list_move(&page->lru, src);
+-			if (!is_migrate_cma(get_pageblock_migratetype(page))
+-				&& !is_migrate_isolate_page(page)) {
+-				BUG_ON(!PageLRU(page));
+-				list_move(&page->lru_normal,
+-						  &lruvec->lists[lru - LRU_BASE
+-						  + LRU_BASE_NORMAL]);
+-			}
+ 			continue;
++		case -EINVAL:
++			src = src->prev;
++			scan--;
++			break;
+ 		default:
+-			pr_err("---%s %d, %x\n",
+-				   __func__, __LINE__, has_cma);
+-			print_lru_info(lruvec);
+-			if (!has_cma) {
+-				src_head = src;
+-				while (src_head->prev != src) {
+-					if (page == lru_to_page(src_head)) {
+-						pr_err("---%s %d, %x, src contains the page\n",
+-							   __func__, __LINE__,
+-							   has_cma);
+-						break;
+-					}
+-					src_head = src_head->prev;
+-				}
+-			}
+ 			BUG();
+ 		}
+ 	}
++isolate_finish:
+ 	*nr_scanned = scan;
+ 	trace_mm_vmscan_lru_isolate(sc->order, nr_to_scan, scan,
+ 				    nr_taken, mode, is_file_lru(lru));
+-	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru + num,
+-						  nr_cma_taken - nr_taken);
+-	num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+-	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru + num,
+-						  -nr_cma_taken);
+ 	return nr_taken;
+ }
+ 
+@@ -1636,7 +1534,6 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 				     &nr_scanned, sc, isolate_mode, lru);
+ 
+ 	__mod_zone_page_state(zone, NR_LRU_BASE + lru, -nr_taken);
+-	__mod_zone_page_state(zone, NR_INACTIVE_ANON_TEST + lru, -nr_taken);
+ 	__mod_zone_page_state(zone, NR_ISOLATED_ANON + file, nr_taken);
+ 
+ 	if (global_reclaim(sc)) {
+@@ -1776,10 +1673,9 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
+ 				     enum lru_list lru)
+ {
+ 	struct zone *zone = lruvec_zone(lruvec);
+-	unsigned long pgmoved = 0, pgmoved_cma = 0;
++	unsigned long pgmoved = 0;
+ 	struct page *page;
+ 	int nr_pages;
+-	int num = NR_INACTIVE_ANON_CMA - NR_INACTIVE_ANON;
+ 
+ 	while (!list_empty(list)) {
+ 		page = lru_to_page(list);
+@@ -1791,19 +1687,7 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
+ 		nr_pages = hpage_nr_pages(page);
+ 		mem_cgroup_update_lru_size(lruvec, lru, nr_pages);
+ 		list_move(&page->lru, &lruvec->lists[lru]);
+-		if (!is_migrate_cma(get_pageblock_migratetype(page)) &&
+-					!is_migrate_isolate_page(page)) {
+-			if (page->lru_normal.next != LIST_POISON1
+-					&& !list_empty(&page->lru_normal))
+-				BUG();
+-			list_add(&page->lru_normal,
+-				 &lruvec->lists[lru - LRU_BASE +
+-					 LRU_BASE_NORMAL]);
+-		}
+ 		pgmoved += nr_pages;
+-		if (is_migrate_cma(get_pageblock_migratetype(page)) ||
+-				is_migrate_isolate_page(page))
+-			pgmoved_cma += nr_pages;
+ 
+ 		if (put_page_testzero(page)) {
+ 			__ClearPageLRU(page);
+@@ -1818,14 +1702,7 @@ static void move_active_pages_to_lru(struct lruvec *lruvec,
+ 				list_add(&page->lru, pages_to_free);
+ 		}
+ 	}
+-	if (pgmoved_cma)
+-		__mod_zone_page_state(zone, NR_LRU_BASE + lru + num,
+-							  pgmoved_cma);
+-	num = NR_INACTIVE_ANON_NORMAL - NR_INACTIVE_ANON;
+-	__mod_zone_page_state(lruvec_zone(lruvec), NR_LRU_BASE + lru + num,
+-						  pgmoved - pgmoved_cma);
+ 	__mod_zone_page_state(zone, NR_LRU_BASE + lru, pgmoved);
+-	__mod_zone_page_state(zone, NR_INACTIVE_ANON_TEST + lru, pgmoved);
+ 	if (!is_active_lru(lru))
+ 		__count_vm_events(PGDEACTIVATE, pgmoved);
+ }
+@@ -1866,7 +1743,6 @@ static void shrink_active_list(unsigned long nr_to_scan,
+ 
+ 	__count_zone_vm_events(PGREFILL, zone, nr_scanned);
+ 	__mod_zone_page_state(zone, NR_LRU_BASE + lru, -nr_taken);
+-	__mod_zone_page_state(zone, NR_INACTIVE_ANON_TEST + lru, -nr_taken);
+ 	__mod_zone_page_state(zone, NR_ISOLATED_ANON + file, nr_taken);
+ 	spin_unlock_irq(&zone->lru_lock);
+ 
+@@ -2053,9 +1929,6 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
+ 	bool force_scan = false;
+ 	unsigned long ap, fp;
+ 	enum lru_list lru;
+-	int ret = 0;
+-	struct per_cpu_pageset __percpu *pcp = zone->pageset;
+-	long t;
+ 
+ 	/*
+ 	 * If the zone or memcg is small, nr[l] can be 0.  This
+@@ -2184,21 +2057,12 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
+ 	fraction[1] = fp;
+ 	denominator = ap + fp + 1;
+ out:
+-	ret = __isolate_cma_ornot(allocflags_to_migratetype(sc->gfp_mask));
+ 	for_each_evictable_lru(lru) {
+ 		int file = is_file_lru(lru);
+-		unsigned long size, tmp_size = 0;
++		unsigned long size;
+ 		unsigned long scan;
+ 
+ 		size = get_lru_size(lruvec, lru);
+-		t = __this_cpu_read(pcp->stat_threshold);
+-		if (!ret) {
+-			tmp_size = get_lru_cma_size(lruvec, lru);
+-			if (size <= tmp_size)
+-				size = 0;
+-			else
+-				size -= tmp_size;
+-		}
+ 		scan = size >> sc->priority;
+ 
+ 		if (!scan && force_scan)
+@@ -2705,6 +2569,7 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
+ 
+ out:
+ 	delayacct_freepages_end();
++
+ 	if (sc->nr_reclaimed)
+ 		return sc->nr_reclaimed;
+ 
+
+From 744394dc0ff52d42e7c6692796644c35514b7010 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:29:16 +0100
+Subject: [PATCH 10/16] Revert "PD#108166: mm: mm optimization"
+
+This reverts commit d5fe616bd151e41b79da5cb5a259ff6fc6902d8c.
+---
+ arch/arm64/include/asm/thread_info.h |  4 +--
+ drivers/block/zram/zram_drv.c        | 64 +-----------------------------------
+ include/linux/swap.h                 |  1 -
+ mm/swap_state.c                      | 28 +---------------
+ mm/swapfile.c                        |  2 +-
+ mm/vmscan.c                          |  2 +-
+ 6 files changed, 6 insertions(+), 95 deletions(-)
+
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 3d8febecf6ed..d609bed26f2e 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -24,10 +24,10 @@
+ #include <linux/compiler.h>
+ 
+ #ifndef CONFIG_ARM64_64K_PAGES
+-#define THREAD_SIZE_ORDER  1
++#define THREAD_SIZE_ORDER	2
+ #endif
+ 
+-#define THREAD_SIZE	 8192
++#define THREAD_SIZE		16384
+ #define THREAD_START_SP		(THREAD_SIZE - 16)
+ 
+ #ifndef __ASSEMBLY__
+diff --git a/drivers/block/zram/zram_drv.c b/drivers/block/zram/zram_drv.c
+index 778d44b13b80..d3db00381727 100644
+--- a/drivers/block/zram/zram_drv.c
++++ b/drivers/block/zram/zram_drv.c
+@@ -38,9 +38,7 @@
+ /* Globals */
+ static int zram_major;
+ static struct zram *zram_devices;
+-void *compress_addr = NULL;
+-void *user_addr = NULL;
+-void *meta_addr = NULL;
++
+ /* Module params (documentation at end) */
+ static unsigned int num_devices = 1;
+ 
+@@ -764,49 +762,7 @@ static void zram_slot_free_notify(struct block_device *bdev,
+ 	atomic64_inc(&zram->stats.notify_free);
+ }
+ 
+-struct prev_use {
+-	unsigned long cmpr_len;
+-	struct page *page;
+-};
+-static int zram_ioctl(struct block_device *bdev,
+-					  fmode_t f_mode,
+-		  unsigned nuse, unsigned long page_addr)
+-{
+-	int ret = 0;
+-	size_t clen;
+-	unsigned char *src = NULL, *uncmem = NULL, *user_mem = NULL;
+-	void *compress_workmem = NULL;
+-	struct prev_use *prev_use;
+-
+-	switch (f_mode) {
+-	case 80:
+-		prev_use = (struct prev_use *)page_addr;
+-		if (!compress_addr || !user_addr || !meta_addr) {
+-			prev_use->cmpr_len = 0;
+-			return -ENOMEM;
+-		}
+-		uncmem = kmap_atomic(prev_use->page);
+-		user_mem = user_addr;
+-		memcpy(user_mem, uncmem, PAGE_SIZE);
+-		src = meta_addr;
+-		compress_workmem = compress_addr;
+-
+-		ret = lzo1x_1_compress(user_mem, PAGE_SIZE, src, &clen,
+-					   compress_workmem);
+-
+-		kunmap_atomic(uncmem);
+-
+-		prev_use->cmpr_len = (unsigned long)clen;
+-		break;
+-
+-	default:
+-		break;
+-	}
+-
+-	return ret;
+-}
+ static const struct block_device_operations zram_devops = {
+-	.ioctl = zram_ioctl,
+ 	.swap_slot_free_notify = zram_slot_free_notify,
+ 	.owner = THIS_MODULE
+ };
+@@ -929,21 +885,6 @@ static int __init zram_init(void)
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+-	compress_addr = kzalloc(LZO1X_MEM_COMPRESS, GFP_KERNEL);
+-	if (!compress_addr) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
+-	user_addr = kzalloc(PAGE_SIZE, GFP_KERNEL);
+-	if (!user_addr) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
+-	meta_addr = kzalloc(PAGE_SIZE << 1, GFP_KERNEL);
+-	if (!meta_addr) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
+ 
+ 	zram_major = register_blkdev(0, "zram");
+ 	if (zram_major <= 0) {
+@@ -998,9 +939,6 @@ static void __exit zram_exit(void)
+ 	unregister_blkdev(zram_major, "zram");
+ 
+ 	kfree(zram_devices);
+-	kfree(meta_addr);
+-	kfree(compress_addr);
+-	kfree(user_addr);
+ 	pr_debug("Cleanup done!\n");
+ }
+ 
+diff --git a/include/linux/swap.h b/include/linux/swap.h
+index eb2fc17295db..f9697798d6fd 100644
+--- a/include/linux/swap.h
++++ b/include/linux/swap.h
+@@ -416,7 +416,6 @@ extern int swp_swapcount(swp_entry_t entry);
+ extern struct swap_info_struct *page_swap_info(struct page *);
+ extern int reuse_swap_page(struct page *);
+ extern int try_to_free_swap(struct page *);
+-extern struct swap_info_struct *swap_info_get(swp_entry_t entry);
+ struct backing_dev_info;
+ 
+ #ifdef CONFIG_MEMCG
+diff --git a/mm/swap_state.c b/mm/swap_state.c
+index d8bb650f863f..272c9f718c48 100644
+--- a/mm/swap_state.c
++++ b/mm/swap_state.c
+@@ -119,36 +119,10 @@ int __add_to_swap_cache(struct page *page, swp_entry_t entry)
+ 	return error;
+ }
+ 
+-#define COMPRESS_PREV_USE 1
+-struct prev_use {
+-	unsigned long cmpr_len;
+-	struct page *page;
+-};
++
+ int add_to_swap_cache(struct page *page, swp_entry_t entry, gfp_t gfp_mask)
+ {
+ 	int error;
+-#if COMPRESS_PREV_USE
+-	unsigned long cmpr_len;
+-	struct prev_use prev_use;
+-	struct block_device *bdev = NULL;
+-	struct swap_info_struct *sis = NULL;
+-	sis = swap_info_get(entry);
+-	if (sis) {
+-		if (sis->flags & SWP_BLKDEV) {
+-			struct gendisk *disk = sis->bdev->bd_disk;
+-			spin_unlock(&sis->lock);
+-			if (disk && disk->fops->ioctl) {
+-				prev_use.page = page;
+-				disk->fops->ioctl(bdev, 80, 0,
+-						 (unsigned long)&prev_use);
+-				cmpr_len = prev_use.cmpr_len;
+-				cmpr_len += cmpr_len >> 1;
+-				if (cmpr_len > PAGE_SIZE)
+-					return -EINVAL;
+-			}
+-		}
+-	}
+-#endif
+ 
+ 	error = radix_tree_maybe_preload(gfp_mask);
+ 	if (!error) {
+diff --git a/mm/swapfile.c b/mm/swapfile.c
+index 2af1679d906a..146892aeb1f1 100644
+--- a/mm/swapfile.c
++++ b/mm/swapfile.c
+@@ -745,7 +745,7 @@ swp_entry_t get_swap_page_of_type(int type)
+ 	return (swp_entry_t) {0};
+ }
+ 
+-struct swap_info_struct *swap_info_get(swp_entry_t entry)
++static struct swap_info_struct *swap_info_get(swp_entry_t entry)
+ {
+ 	struct swap_info_struct *p;
+ 	unsigned long offset, type;
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 74f149c33490..95d774feb80f 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -131,7 +131,7 @@ struct scan_control {
+ /*
+  * From 0 .. 100.  Higher means more swappy.
+  */
+-int vm_swappiness = 60;
++int vm_swappiness = 80;
+ unsigned long vm_total_pages;	/* The total number of pages which the VM controls */
+ 
+ static LIST_HEAD(shrinker_list);
+
+From ab844a4427ecb974816063d4a2a53c4bf4d0e4e3 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:29:23 +0100
+Subject: [PATCH 11/16] Revert "PD#108767: mm: adjust virtual memory area
+ layout for vmalloc"
+
+This reverts commit 069afbc25a002b0a64a6bb51224173454926702a.
+---
+ arch/arm64/include/asm/pgtable.h | 2 +-
+ mm/slub.c                        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index b2fc5c3f40d7..e28747e15a36 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -35,7 +35,7 @@
+  * VMALLOC and SPARSEMEM_VMEMMAP ranges.
+  */
+ #define VMALLOC_START		(UL(0xffffffffffffffff) << VA_BITS)
+-#define VMALLOC_END		(VMALLOC_START + SZ_1G)
++#define VMALLOC_END		(PAGE_OFFSET - UL(0x400000000) - SZ_64K)
+ 
+ #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
+ 
+diff --git a/mm/slub.c b/mm/slub.c
+index 9e46cd810c17..7611f148ee81 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2724,7 +2724,7 @@ EXPORT_SYMBOL(kmem_cache_free);
+  * take the list_lock.
+  */
+ static int slub_min_order;
+-static int slub_max_order = 1;
++static int slub_max_order = PAGE_ALLOC_COSTLY_ORDER;
+ static int slub_min_objects;
+ 
+ /*
+
+From 22fc2f12843818da6acfff11e3d5d0429691553a Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:33:15 +0100
+Subject: [PATCH 12/16] Revert "PD#108319: amports: fix fetchbuf bug, need used
+ for dma"
+
+This reverts commit 45f15b276d47953728284f15a752ce6b1973a0e0.
+---
+ drivers/amlogic/amports/streambuf.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/amlogic/amports/streambuf.c b/drivers/amlogic/amports/streambuf.c
+index 2fd8c5a10f69..406bb07caafc 100644
+--- a/drivers/amlogic/amports/streambuf.c
++++ b/drivers/amlogic/amports/streambuf.c
+@@ -159,8 +159,7 @@ int stbuf_fetch_init(void)
+ 	if (NULL != fetchbuf)
+ 		return 0;
+ 
+-	fetchbuf = (void *)__get_free_pages(GFP_KERNEL,
+-						get_order(FETCHBUF_SIZE));
++	fetchbuf = vmalloc(FETCHBUF_SIZE);
+ 
+ 	if (!fetchbuf) {
+ 		pr_info("%s: Can not allocate fetch working buffer\n",
+@@ -172,9 +171,8 @@ int stbuf_fetch_init(void)
+ 
+ void stbuf_fetch_release(void)
+ {
+-	if (0 && fetchbuf) {
+-		/* always don't free.for safe alloc/free*/
+-		free_pages((unsigned long)fetchbuf, get_order(FETCHBUF_SIZE));
++	if (fetchbuf) {
++		vfree(fetchbuf);
+ 		fetchbuf = 0;
+ 	}
+ 
+
+From 7f9b475896693808b317ba186edd47c4e4915a6c Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:33:21 +0100
+Subject: [PATCH 13/16] Revert "PD#108319: mm: optimization for low memory"
+
+This reverts commit b0d8967a339d4480cfa677e781d0788387f7b4ff.
+---
+ drivers/amlogic/amports/streambuf.c |  6 +++---
+ drivers/base/Kconfig                |  2 +-
+ mm/page_alloc.c                     | 21 +++++----------------
+ mm/vmscan.c                         | 26 +++++++++-----------------
+ net/wireless/core.c                 |  9 ++++-----
+ 5 files changed, 22 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/amlogic/amports/streambuf.c b/drivers/amlogic/amports/streambuf.c
+index 406bb07caafc..2e12644aeaf1 100644
+--- a/drivers/amlogic/amports/streambuf.c
++++ b/drivers/amlogic/amports/streambuf.c
+@@ -26,7 +26,6 @@
+ #include <linux/amlogic/iomap.h>
+ #include <asm/cacheflush.h>
+ #include <linux/uaccess.h>
+-#include <linux/vmalloc.h>
+ /* #include <mach/am_regs.h> */
+ 
+ #include "vdec_reg.h"
+@@ -159,7 +158,8 @@ int stbuf_fetch_init(void)
+ 	if (NULL != fetchbuf)
+ 		return 0;
+ 
+-	fetchbuf = vmalloc(FETCHBUF_SIZE);
++	fetchbuf =
++		(void *)__get_free_pages(GFP_KERNEL, get_order(FETCHBUF_SIZE));
+ 
+ 	if (!fetchbuf) {
+ 		pr_info("%s: Can not allocate fetch working buffer\n",
+@@ -172,7 +172,7 @@ int stbuf_fetch_init(void)
+ void stbuf_fetch_release(void)
+ {
+ 	if (fetchbuf) {
+-		vfree(fetchbuf);
++		free_pages((unsigned long)fetchbuf, get_order(FETCHBUF_SIZE));
+ 		fetchbuf = 0;
+ 	}
+ 
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index 97e73dd94907..9829d1f30170 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -225,7 +225,7 @@ comment "Default contiguous memory area size:"
+ config CMA_SIZE_MBYTES
+ 	int "Size in Mega Bytes"
+ 	depends on !CMA_SIZE_SEL_PERCENTAGE
+-	default 8
++	default 16
+ 	help
+ 	  Defines the size (in MiB) of the default memory area for Contiguous
+ 	  Memory Allocator.
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 59a8c856d452..08d4f8b75152 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1652,7 +1652,7 @@ struct page *buffered_rmqueue(struct zone *preferred_zone,
+ 			gfp_t gfp_flags, int migratetype)
+ {
+ 	unsigned long flags;
+-	struct page *page, *tmp_page = NULL;
++	struct page *page;
+ 	bool cold = ((gfp_flags & __GFP_COLD) != 0);
+ 
+ again:
+@@ -1697,20 +1697,7 @@ again:
+ 					  get_pageblock_migratetype(page));
+ 				goto alloc_sucess;
+ 			}
+-		} else if (migratetype == MIGRATE_MOVABLE) {
+-			if (get_pageblock_migratetype(page) != MIGRATE_CMA) {
+-				spin_lock(&zone->lock);
+-				tmp_page = __rmqueue(zone, order, MIGRATE_CMA);
+-				spin_unlock(&zone->lock);
+-				if (!tmp_page)
+-					goto use_pcp_page;
+-				page = tmp_page;
+-				__mod_zone_freepage_state(zone, -(1 << order),
+-					  get_pageblock_migratetype(page));
+-				goto alloc_sucess;
+-			}
+ 		}
+-use_pcp_page:
+ #endif
+ 		list_del(&page->lru);
+ 		pcp->count--;
+@@ -2985,6 +2972,7 @@ out:
+ 		goto retry_cpuset;
+ 
+ 	memcg_kmem_commit_charge(page, memcg, order);
++
+ 	return page;
+ }
+ EXPORT_SYMBOL(__alloc_pages_nodemask);
+@@ -5828,6 +5816,7 @@ static void __setup_per_zone_wmarks(void)
+ 		do_div(min, lowmem_pages);
+ 		low = (u64)pages_low * zone->managed_pages;
+ 		do_div(low, vm_total_pages);
++
+ 		if (is_highmem(zone)) {
+ 			/*
+ 			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
+@@ -5852,9 +5841,9 @@ static void __setup_per_zone_wmarks(void)
+ 		}
+ 
+ 		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) +
+-					(min >> 2);
++					low + (min >> 2);
+ 		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) +
+-					(min >> 1);
++					low + (min >> 1);
+ 
+ 		__mod_zone_page_state(zone, NR_ALLOC_BATCH,
+ 			high_wmark_pages(zone) - low_wmark_pages(zone) -
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 95d774feb80f..6640193a38f0 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -50,7 +50,6 @@
+ 
+ #include <linux/swapops.h>
+ #include <linux/balloon_compaction.h>
+-#include <linux/page-isolation.h>
+ 
+ #include "internal.h"
+ 
+@@ -131,7 +130,7 @@ struct scan_control {
+ /*
+  * From 0 .. 100.  Higher means more swappy.
+  */
+-int vm_swappiness = 80;
++int vm_swappiness = 60;
+ unsigned long vm_total_pages;	/* The total number of pages which the VM controls */
+ 
+ static LIST_HEAD(shrinker_list);
+@@ -1108,6 +1107,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 
+ 		if (!mapping || !__remove_mapping(mapping, page))
+ 			goto keep_locked;
++
+ 		/*
+ 		 * At this point, we have no other references and there is
+ 		 * no way to pick any more up (removed from LRU, removed
+@@ -1201,7 +1201,7 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
+ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+ {
+ 	int ret = -EINVAL;
+-	unsigned long free_cma = 0, total_free = 0;
++	unsigned long free_cma, total_free;
+ 
+ 	if (!(mode & ISOLATE_UNEVICTABLE)) {
+ #if 1
+@@ -1210,11 +1210,10 @@ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+ 		total_free = global_page_state(NR_FREE_PAGES);
+ 		if (page) {
+ 			if ((free_cma > total_free) &&
+-				(is_migrate_cma(
+-					   get_pageblock_migratetype(page))
+-				 || is_migrate_isolate(
+-					   get_pageblock_migratetype(page))))
+-				return ret;
++				is_migrate_cma(
++					   get_pageblock_migratetype(page))) {
++				return -EBUSY;
++			}
+ 		}
+ #endif
+ 	}
+@@ -1305,7 +1304,6 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 		isolate_mode_t mode, enum lru_list lru)
+ {
+ 	struct list_head *src = &lruvec->lists[lru];
+-	struct list_head *src_head = src;
+ 	unsigned long nr_taken = 0;
+ 	unsigned long scan;
+ 
+@@ -1313,9 +1311,6 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 		struct page *page;
+ 		int nr_pages;
+ 
+-		if (src->prev == src_head)
+-			goto isolate_finish;
+-
+ 		page = lru_to_page(src);
+ 		prefetchw_prev_lru_page(page, src, flags);
+ 
+@@ -1333,15 +1328,12 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
+ 			/* else it is being freed elsewhere */
+ 			list_move(&page->lru, src);
+ 			continue;
+-		case -EINVAL:
+-			src = src->prev;
+-			scan--;
+-			break;
++
+ 		default:
+ 			BUG();
+ 		}
+ 	}
+-isolate_finish:
++
+ 	*nr_scanned = scan;
+ 	trace_mm_vmscan_lru_isolate(sc->order, nr_to_scan, scan,
+ 				    nr_taken, mode, is_file_lru(lru));
+diff --git a/net/wireless/core.c b/net/wireless/core.c
+index 23bf705bf4d6..a3bf18d11609 100644
+--- a/net/wireless/core.c
++++ b/net/wireless/core.c
+@@ -18,7 +18,6 @@
+ #include <linux/etherdevice.h>
+ #include <linux/rtnetlink.h>
+ #include <linux/sched.h>
+-#include <linux/vmalloc.h>
+ #include <net/genetlink.h>
+ #include <net/cfg80211.h>
+ #include "nl80211.h"
+@@ -281,7 +280,7 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
+ 
+ 	alloc_size = sizeof(*rdev) + sizeof_priv;
+ 
+-	rdev = vzalloc(alloc_size);
++	rdev = kzalloc(alloc_size, GFP_KERNEL);
+ 	if (!rdev)
+ 		return NULL;
+ 
+@@ -292,7 +291,7 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
+ 	if (unlikely(rdev->wiphy_idx < 0)) {
+ 		/* ugh, wrapped! */
+ 		atomic_dec(&wiphy_counter);
+-		vfree(rdev);
++		kfree(rdev);
+ 		return NULL;
+ 	}
+ 
+@@ -331,7 +330,7 @@ struct wiphy *wiphy_new(const struct cfg80211_ops *ops, int sizeof_priv)
+ 				   &rdev->rfkill_ops, rdev);
+ 
+ 	if (!rdev->rfkill) {
+-		vfree(rdev);
++		kfree(rdev);
+ 		return NULL;
+ 	}
+ 
+@@ -697,7 +696,7 @@ void cfg80211_dev_free(struct cfg80211_registered_device *rdev)
+ 	}
+ 	list_for_each_entry_safe(scan, tmp, &rdev->bss_list, list)
+ 		cfg80211_put_bss(&rdev->wiphy, &scan->pub);
+-	vfree(rdev);
++	kfree(rdev);
+ }
+ 
+ void wiphy_free(struct wiphy *wiphy)
+
+From cd1919da39bb93a7929d23a996ac30a5de1a72d5 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:33:34 +0100
+Subject: [PATCH 14/16] Revert "vmalloc: filter removed vmap_area when
+ get_vmalloc_info"
+
+This reverts commit 7b92f43292e8a2fa5252eb1d4fe9c4b2d226d5dd.
+---
+ mm/vmalloc.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index bcfa9054989f..aa3891e8e388 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -2702,9 +2702,6 @@ void get_vmalloc_info(struct vmalloc_info *vmi)
+ 		if (va->flags & (VM_LAZY_FREE | VM_LAZY_FREEING))
+ 			continue;
+ 
+-		if (!(va->flags & VM_VM_AREA))
+-			continue;
+-
+ 		vmi->used += (va->va_end - va->va_start);
+ 
+ 		free_area_size = addr - prev_end;
+
+From 15fc9e6ee184ea1777cc010183c0af5d5ee66ce7 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:33:42 +0100
+Subject: [PATCH 15/16] Revert "mm:  transplant optimization from 3.10"
+
+This reverts commit af2bfba16ac05d8d15f183b91ea82c7e73c41cf3.
+---
+ arch/arm64/Kconfig                   |  3 --
+ arch/arm64/include/asm/scatterlist.h | 12 -------
+ arch/arm64/mm/init.c                 |  2 +-
+ drivers/amlogic/ion_dev/Kconfig      |  1 -
+ drivers/input/evdev.c                |  3 --
+ fs/block_dev.c                       |  4 ---
+ fs/dcache.c                          |  2 +-
+ fs/mpage.c                           | 24 ++++---------
+ include/linux/compaction.h           |  2 +-
+ include/linux/mm.h                   | 18 +---------
+ include/linux/pagevec.h              | 14 +-------
+ mm/compaction.c                      | 24 +++----------
+ mm/filemap.c                         | 70 ++----------------------------------
+ mm/memory.c                          | 20 ++---------
+ mm/migrate.c                         | 20 -----------
+ mm/oom_kill.c                        | 12 +------
+ mm/page_alloc.c                      | 13 +------
+ mm/page_isolation.c                  | 44 +++--------------------
+ mm/readahead.c                       | 33 +----------------
+ mm/shmem.c                           | 15 --------
+ mm/swap_state.c                      | 20 ++++-------
+ mm/vmscan.c                          | 34 ++----------------
+ net/core/skbuff.c                    | 13 +++----
+ 23 files changed, 41 insertions(+), 362 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/scatterlist.h
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3e690525c7e5..22ff23ec8cf8 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -74,9 +74,6 @@ config ARM64
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+ 
+-config ARM64_HAS_SG_CHAIN
+-	bool
+-
+ config 64BIT
+ 	def_bool y
+ 
+diff --git a/arch/arm64/include/asm/scatterlist.h b/arch/arm64/include/asm/scatterlist.h
+deleted file mode 100644
+index 7d5db30183a4..000000000000
+--- a/arch/arm64/include/asm/scatterlist.h
++++ /dev/null
+@@ -1,12 +0,0 @@
+-#ifndef _ASMARM_SCATTERLIST_H
+-#define _ASMARM_SCATTERLIST_H
+-
+-#ifdef CONFIG_ARM64_HAS_SG_CHAIN
+-#define ARCH_HAS_SG_CHAIN
+-#endif
+-
+-#include <asm/memory.h>
+-#include <asm/types.h>
+-#include <asm-generic/scatterlist.h>
+-
+-#endif /* _ASMARM_SCATTERLIST_H */
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 28b8f7abd7fe..589101027c46 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -370,7 +370,7 @@ void __init mem_init(void)
+ 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
+ 
+ #ifndef CONFIG_SPARSEMEM_VMEMMAP
+-	/*free_unused_memmap();*/
++	free_unused_memmap();
+ #endif
+ 	/* this will put all unused low memory onto the freelists */
+ 	free_all_bootmem();
+diff --git a/drivers/amlogic/ion_dev/Kconfig b/drivers/amlogic/ion_dev/Kconfig
+index 0f795d647108..61bc87177026 100644
+--- a/drivers/amlogic/ion_dev/Kconfig
++++ b/drivers/amlogic/ion_dev/Kconfig
+@@ -4,7 +4,6 @@ config AMLOGIC_ION
+ 	tristate "ION memeory management support"
+ 	select ION
+ 	select ARM_HAS_SG_CHAIN
+-	select ARM64_HAS_SG_CHAIN
+ 	default n
+ 	---help---
+ 	Select to enable "Amlogic ion device support.
+diff --git a/drivers/input/evdev.c b/drivers/input/evdev.c
+index 810d9c1371d0..c650cd6a8167 100644
+--- a/drivers/input/evdev.c
++++ b/drivers/input/evdev.c
+@@ -416,9 +416,6 @@ static int evdev_open(struct inode *inode, struct file *file)
+ 
+  err_free_client:
+ 	evdev_detach_client(evdev, client);
+-	if (is_vmalloc_addr(client))
+-		vfree(client);
+-	else
+ 	kfree(client);
+ 	return error;
+ }
+diff --git a/fs/block_dev.c b/fs/block_dev.c
+index 1cc36bbbb420..200ec0e2bd65 100644
+--- a/fs/block_dev.c
++++ b/fs/block_dev.c
+@@ -28,7 +28,6 @@
+ #include <linux/log2.h>
+ #include <linux/cleancache.h>
+ #include <linux/aio.h>
+-#include <linux/syscalls.h>
+ #include <asm/uaccess.h>
+ #include "internal.h"
+ 
+@@ -631,9 +630,6 @@ void bd_forget(struct inode *inode)
+ static bool bd_may_claim(struct block_device *bdev, struct block_device *whole,
+ 			 void *holder)
+ {
+-	if (bdev->bd_holder == sys_swapon)
+-		return true;
+-
+ 	if (bdev->bd_holder == holder)
+ 		return true;	 /* already a holder */
+ 	else if (bdev->bd_holder != NULL)
+diff --git a/fs/dcache.c b/fs/dcache.c
+index 3c401f05603b..a0e9ae3ae083 100644
+--- a/fs/dcache.c
++++ b/fs/dcache.c
+@@ -3073,7 +3073,7 @@ char *dynamic_dname(struct dentry *dentry, char *buffer, int buflen,
+ 			const char *fmt, ...)
+ {
+ 	va_list args;
+-	char temp[256];
++	char temp[64];
+ 	int sz;
+ 
+ 	va_start(args, fmt);
+diff --git a/fs/mpage.c b/fs/mpage.c
+index e8e6a3a495cc..4979ffa60aaa 100644
+--- a/fs/mpage.c
++++ b/fs/mpage.c
+@@ -108,8 +108,8 @@ mpage_alloc(struct block_device *bdev,
+  * them.  So when the buffer is up to date and the page size == block size,
+  * this marks the page up to date instead of adding new buffers.
+  */
+-static void
+-map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block)
++static void 
++map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block) 
+ {
+ 	struct inode *inode = page->mapping->host;
+ 	struct buffer_head *page_bh, *head;
+@@ -120,9 +120,9 @@ map_buffer_to_page(struct page *page, struct buffer_head *bh, int page_block)
+ 		 * don't make any buffers if there is only one buffer on
+ 		 * the page and the page just needs to be set up to date
+ 		 */
+-		if (inode->i_blkbits == PAGE_CACHE_SHIFT &&
++		if (inode->i_blkbits == PAGE_CACHE_SHIFT && 
+ 		    buffer_uptodate(bh)) {
+-			SetPageUptodate(page);
++			SetPageUptodate(page);    
+ 			return;
+ 		}
+ 		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
+@@ -239,7 +239,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
+ 			map_buffer_to_page(page, map_bh, page_block);
+ 			goto confused;
+ 		}
+-
++	
+ 		if (first_hole != blocks_per_page)
+ 			goto confused;		/* hole -> non-hole */
+ 
+@@ -370,16 +370,7 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
+ 	sector_t last_block_in_bio = 0;
+ 	struct buffer_head map_bh;
+ 	unsigned long first_logical_block = 0;
+-#ifdef CONFIG_CMA
+-	bool has_cma = false;
+-	struct page *tmp_page = NULL;
+ 
+-	list_for_each_entry(tmp_page, pages, lru) {
+-		has_cma = has_cma_page(tmp_page);
+-		if (has_cma)
+-			break;
+-	}
+-#endif
+ 	map_bh.b_state = 0;
+ 	map_bh.b_size = 0;
+ 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
+@@ -397,9 +388,6 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
+ 		}
+ 		page_cache_release(page);
+ 	}
+-#ifdef CONFIG_CMA
+-	wakeup_wq(has_cma);
+-#endif
+ 	BUG_ON(!list_empty(pages));
+ 	if (bio)
+ 		mpage_bio_submit(READ, bio);
+@@ -438,7 +426,7 @@ EXPORT_SYMBOL(mpage_readpage);
+  *
+  * If all blocks are found to be contiguous then the page can go into the
+  * BIO.  Otherwise fall back to the mapping's writepage().
+- *
++ * 
+  * FIXME: This code wants an estimate of how many pages are still to be
+  * written, so it can intelligently allocate a suitably-sized BIO.  For now,
+  * just allocate full-size (16-page) BIOs.
+diff --git a/include/linux/compaction.h b/include/linux/compaction.h
+index 31d6dede1156..01e3132820da 100644
+--- a/include/linux/compaction.h
++++ b/include/linux/compaction.h
+@@ -28,7 +28,7 @@ extern void reset_isolation_suitable(pg_data_t *pgdat);
+ extern unsigned long compaction_suitable(struct zone *zone, int order);
+ 
+ /* Do not skip compaction more than 64 times */
+-#define COMPACT_MAX_DEFER_SHIFT 0
++#define COMPACT_MAX_DEFER_SHIFT 6
+ 
+ /*
+  * Compaction is deferred when compaction fails to result in a page
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 88ab78c881bd..3947be3cffb2 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -58,22 +58,6 @@ extern const int mmap_rnd_compat_bits_max;
+ extern int mmap_rnd_compat_bits __read_mostly;
+ #endif
+ 
+-#ifdef CONFIG_CMA
+-#define MIGRATE_CMA_HOLD  1
+-#define MIGRATE_CMA_ALLOC 2
+-#define MIGRATE_CMA_REL   3
+-extern bool has_cma_page(struct page *page);
+-extern void wakeup_wq(bool has_cma);
+-extern int iso_status;
+-extern int iso_recount;
+-extern wait_queue_head_t iso_wq;
+-extern struct mutex iso_wait;
+-extern struct mutex migrate_wait;
+-extern int migrate_status;
+-extern int mutex_status;
+-extern int migrate_refcount;
+-extern wait_queue_head_t migrate_wq;
+-#endif
+ #include <asm/page.h>
+ #include <asm/pgtable.h>
+ #include <asm/processor.h>
+@@ -242,7 +226,7 @@ struct vm_fault {
+ /*
+  * These are the virtual MM functions - opening of an area, closing and
+  * unmapping it (needed to keep files on disk up-to-date etc), pointer
+- * to the functions called when a no-page or a wp-page exception occurs.
++ * to the functions called when a no-page or a wp-page exception occurs. 
+  */
+ struct vm_operations_struct {
+ 	void (*open)(struct vm_area_struct * area);
+diff --git a/include/linux/pagevec.h b/include/linux/pagevec.h
+index 0c60f88c00f9..b45d391b4540 100644
+--- a/include/linux/pagevec.h
++++ b/include/linux/pagevec.h
+@@ -11,7 +11,6 @@
+ /* 14 pointers + two long's align the pagevec structure to a power of two */
+ #define PAGEVEC_SIZE	14
+ 
+-#include <linux/page-isolation.h>
+ struct page;
+ struct address_space;
+ 
+@@ -60,19 +59,8 @@ static inline unsigned pagevec_space(struct pagevec *pvec)
+  */
+ static inline unsigned pagevec_add(struct pagevec *pvec, struct page *page)
+ {
+-	unsigned ret = 0;
+-
+ 	pvec->pages[pvec->nr++] = page;
+-	ret = pagevec_space(pvec);
+-
+-#ifdef CONFIG_CMA
+-	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
+-	   is_migrate_isolate(get_pageblock_migratetype(page))) {
+-		ret = 0;
+-	}
+-#endif
+-
+-	return ret;
++	return pagevec_space(pvec);
+ }
+ 
+ static inline void pagevec_release(struct pagevec *pvec)
+diff --git a/mm/compaction.c b/mm/compaction.c
+index 0bdc26173bde..a522208bb8ea 100644
+--- a/mm/compaction.c
++++ b/mm/compaction.c
+@@ -387,7 +387,7 @@ unsigned long
+ isolate_freepages_range(struct compact_control *cc,
+ 			unsigned long start_pfn, unsigned long end_pfn)
+ {
+-	unsigned long isolated = 0, pfn, block_end_pfn;
++	unsigned long isolated, pfn, block_end_pfn;
+ 	LIST_HEAD(freelist);
+ 
+ 	for (pfn = start_pfn; pfn < end_pfn; pfn += isolated) {
+@@ -703,7 +703,7 @@ next_pageblock:
+  * suitable for isolating free pages from and then isolate them.
+  */
+ static void isolate_freepages(struct zone *zone,
+-			struct compact_control *cc, struct page *migratepage)
++				struct compact_control *cc)
+ {
+ 	struct page *page;
+ 	unsigned long block_start_pfn;	/* start of current pageblock */
+@@ -711,17 +711,7 @@ static void isolate_freepages(struct zone *zone,
+ 	unsigned long low_pfn;	     /* lowest pfn scanner is able to scan */
+ 	int nr_freepages = cc->nr_freepages;
+ 	struct list_head *freelist = &cc->freepages;
+-#ifdef CONFIG_CMA
+-	struct address_space *mapping = NULL;
+-	bool use_cma = true;
+-
+-	mapping = page_mapping(migratepage);
+-	if ((unsigned long)mapping & PAGE_MAPPING_ANON)
+-		mapping = NULL;
+ 
+-	if (mapping && (mapping_gfp_mask(mapping) & __GFP_BDEV))
+-		use_cma = false;
+-#endif
+ 	/*
+ 	 * Initialise the free scanner. The starting point is where we last
+ 	 * successfully isolated from, zone-cached value, or the end of the
+@@ -779,12 +769,6 @@ static void isolate_freepages(struct zone *zone,
+ 		if (!isolation_suitable(cc, page))
+ 			continue;
+ 
+-#ifdef CONFIG_CMA
+-		if (is_migrate_isolate(get_pageblock_migratetype(page)))
+-			continue;
+-		if (!use_cma && is_migrate_cma(get_pageblock_migratetype(page)))
+-			continue;
+-#endif
+ 		/* Found a block suitable for isolating free pages from */
+ 		cc->free_pfn = block_start_pfn;
+ 		isolated = isolate_freepages_block(cc, block_start_pfn,
+@@ -838,7 +822,7 @@ static struct page *compaction_alloc(struct page *migratepage,
+ 	 */
+ 	if (list_empty(&cc->freepages)) {
+ 		if (!cc->contended)
+-			isolate_freepages(cc->zone, cc, migratepage);
++			isolate_freepages(cc->zone, cc);
+ 
+ 		if (list_empty(&cc->freepages))
+ 			return NULL;
+@@ -1131,7 +1115,7 @@ static unsigned long compact_zone_order(struct zone *zone, int order,
+ 	return ret;
+ }
+ 
+-int sysctl_extfrag_threshold = 200;
++int sysctl_extfrag_threshold = 500;
+ 
+ /**
+  * try_to_compact_pages - Direct compact to satisfy a high-order allocation
+diff --git a/mm/filemap.c b/mm/filemap.c
+index 38514ee5f6f7..ca9efc6fff3b 100644
+--- a/mm/filemap.c
++++ b/mm/filemap.c
+@@ -45,54 +45,6 @@
+ 
+ #include <asm/mman.h>
+ 
+-#ifdef CONFIG_CMA
+-DEFINE_MUTEX(migrate_wait);
+-EXPORT_SYMBOL(migrate_wait);
+-int migrate_status = 0;
+-EXPORT_SYMBOL(migrate_status);
+-int mutex_status = 0;
+-EXPORT_SYMBOL(mutex_status);
+-int migrate_refcount = 0;
+-EXPORT_SYMBOL(migrate_refcount);
+-wait_queue_head_t migrate_wq;
+-EXPORT_SYMBOL(migrate_wq);
+-void wakeup_wq(bool has_cma)
+-{
+-	if (has_cma) {
+-		if (migrate_refcount > 0) {
+-			mutex_lock(&migrate_wait);
+-			mutex_status = 0x0d;
+-			migrate_refcount--;
+-			if (!migrate_refcount) {
+-				if (migrate_status == MIGRATE_CMA_ALLOC) {
+-					wake_up_interruptible(&migrate_wq);
+-					migrate_status = MIGRATE_CMA_REL;
+-				}
+-			}
+-			mutex_status = 0x0d1;
+-			mutex_unlock(&migrate_wait);
+-		}
+-	}
+-}
+-EXPORT_SYMBOL(wakeup_wq);
+-bool has_cma_page(struct page *page)
+-{
+-	if (is_migrate_cma(get_pageblock_migratetype(page)) ||
+-	   is_migrate_isolate(get_pageblock_migratetype(page))) {
+-		migrate_refcount++;
+-		if (migrate_status != MIGRATE_CMA_ALLOC)
+-			migrate_status = MIGRATE_CMA_HOLD;
+-		return true;
+-	}
+-	return false;
+-}
+-EXPORT_SYMBOL(has_cma_page);
+-#else
+-void wakeup_wq(bool has_cma) {; }
+-EXPORT_SYMBOL(wakeup_wq);
+-bool has_cma_page(struct page *page) {return false; }
+-EXPORT_SYMBOL(has_cma_page);
+-#endif
+ /*
+  * Shared mappings implemented 30.11.1994. It's not fully working yet,
+  * though.
+@@ -1363,7 +1315,6 @@ static void do_generic_file_read(struct file *filp, loff_t *ppos,
+ 	unsigned long offset;      /* offset into pagecache page */
+ 	unsigned int prev_offset;
+ 	int error;
+-	bool has_cma = false;
+ 
+ 	index = *ppos >> PAGE_CACHE_SHIFT;
+ 	prev_index = ra->prev_pos >> PAGE_CACHE_SHIFT;
+@@ -1388,8 +1339,6 @@ find_page:
+ 			if (unlikely(page == NULL))
+ 				goto no_cached_page;
+ 		}
+-		if (!has_cma)
+-			has_cma = has_cma_page(page);
+ 		if (PageReadahead(page)) {
+ 			page_cache_async_readahead(mapping,
+ 					ra, filp, page,
+@@ -1560,13 +1509,10 @@ no_cached_page:
+ 			desc->error = error;
+ 			goto out;
+ 		}
+-		if (!has_cma)
+-			has_cma = has_cma_page(page);
+ 		goto readpage;
+ 	}
+ 
+ out:
+-	wakeup_wq(has_cma);
+ 	ra->prev_pos = prev_index;
+ 	ra->prev_pos <<= PAGE_CACHE_SHIFT;
+ 	ra->prev_pos |= prev_offset;
+@@ -1763,7 +1709,7 @@ EXPORT_SYMBOL(generic_file_aio_read);
+ static int page_cache_read(struct file *file, pgoff_t offset)
+ {
+ 	struct address_space *mapping = file->f_mapping;
+-	struct page *page;
++	struct page *page; 
+ 	int ret;
+ 
+ 	do {
+@@ -1780,7 +1726,7 @@ static int page_cache_read(struct file *file, pgoff_t offset)
+ 		page_cache_release(page);
+ 
+ 	} while (ret == AOP_TRUNCATED_PAGE);
+-
++		
+ 	return ret;
+ }
+ 
+@@ -1876,7 +1822,6 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	struct page *page;
+ 	pgoff_t size;
+ 	int ret = 0;
+-	bool has_cma = false;
+ 
+ 	size = (i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+ 	if (offset >= size)
+@@ -1887,7 +1832,6 @@ int filemap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+ 	 */
+ 	page = find_get_page(mapping, offset);
+ 	if (likely(page) && !(vmf->flags & FAULT_FLAG_TRIED)) {
+-		has_cma = has_cma_page(page);
+ 		/*
+ 		 * We found the page, so try async readahead before
+ 		 * waiting for the lock.
+@@ -1903,12 +1847,10 @@ retry_find:
+ 		page = find_get_page(mapping, offset);
+ 		if (!page)
+ 			goto no_cached_page;
+-		has_cma = has_cma_page(page);
+ 	}
+ 
+ 	if (!lock_page_or_retry(page, vma->vm_mm, vmf->flags)) {
+ 		page_cache_release(page);
+-		wakeup_wq(has_cma);
+ 		return ret | VM_FAULT_RETRY;
+ 	}
+ 
+@@ -1916,8 +1858,6 @@ retry_find:
+ 	if (unlikely(page->mapping != mapping)) {
+ 		unlock_page(page);
+ 		put_page(page);
+-		wakeup_wq(has_cma);
+-		has_cma = false;
+ 		goto retry_find;
+ 	}
+ 	VM_BUG_ON_PAGE(page->index != offset, page);
+@@ -1937,12 +1877,10 @@ retry_find:
+ 	if (unlikely(offset >= size)) {
+ 		unlock_page(page);
+ 		page_cache_release(page);
+-		wakeup_wq(has_cma);
+ 		return VM_FAULT_SIGBUS;
+ 	}
+ 
+ 	vmf->page = page;
+-	wakeup_wq(has_cma);
+ 	return ret | VM_FAULT_LOCKED;
+ 
+ no_cached_page:
+@@ -1984,8 +1922,6 @@ page_not_uptodate:
+ 			error = -EIO;
+ 	}
+ 	page_cache_release(page);
+-	wakeup_wq(has_cma);
+-	has_cma = false;
+ 
+ 	if (!error || error == AOP_TRUNCATED_PAGE)
+ 		goto retry_find;
+@@ -2636,7 +2572,7 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
+ 		written += status;
+ 		*ppos = pos + status;
+   	}
+-
++	
+ 	return written ? written : status;
+ }
+ EXPORT_SYMBOL(generic_file_buffered_write);
+diff --git a/mm/memory.c b/mm/memory.c
+index 0bb1b7ee3c5f..dc52d8c7bb6f 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -1074,7 +1074,6 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
+ {
+ 	struct mm_struct *mm = tlb->mm;
+ 	int force_flush = 0;
+-	bool has_cma = false;
+ 	int rss[NR_MM_COUNTERS];
+ 	spinlock_t *ptl;
+ 	pte_t *start_pte;
+@@ -1137,8 +1136,6 @@ again:
+ 				rss[MM_FILEPAGES]--;
+ 			}
+ 			page_remove_rmap(page);
+-			if (!has_cma)
+-				has_cma = has_cma_page(page);
+ 			if (unlikely(page_mapcount(page) < 0))
+ 				print_bad_pte(vma, addr, ptent, page);
+ 			force_flush = !__tlb_remove_page(tlb, page);
+@@ -1185,7 +1182,7 @@ again:
+ 	 * the PTE lock to avoid doing the potential expensive TLB invalidate
+ 	 * and page-free while holding it.
+ 	 */
+-	if (force_flush || has_cma) {
++	if (force_flush) {
+ 		unsigned long old_end;
+ 
+ 		force_flush = 0;
+@@ -1199,12 +1196,10 @@ again:
+ 		tlb->end = addr;
+ 
+ 		tlb_flush_mmu(tlb);
+-		wakeup_wq(has_cma);
+ 
+ 		tlb->start = addr;
+ 		tlb->end = old_end;
+ 
+-		has_cma = false;
+ 		if (addr != end)
+ 			goto again;
+ 	}
+@@ -1722,7 +1717,7 @@ long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
+ 
+ 	VM_BUG_ON(!!pages != !!(gup_flags & FOLL_GET));
+ 
+-	/*
++	/* 
+ 	 * Require read or write permissions.
+ 	 * If FOLL_FORCE is set, we only require the "MAY" flags.
+ 	 */
+@@ -3034,7 +3029,6 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 	struct mem_cgroup *ptr;
+ 	int exclusive = 0;
+ 	int ret = 0;
+-	bool has_cma = false;
+ 
+ 	if (!pte_unmap_same(mm, pmd, page_table, orig_pte))
+ 		goto out;
+@@ -3082,8 +3076,6 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		swapcache = page;
+ 		goto out_release;
+ 	}
+-	if (!has_cma)
+-		has_cma = has_cma_page(page);
+ 
+ 	swapcache = page;
+ 	locked = lock_page_or_retry(page, mm, flags);
+@@ -3190,7 +3182,6 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
+ unlock:
+ 	pte_unmap_unlock(page_table, ptl);
+ out:
+-	wakeup_wq(has_cma);
+ 	return ret;
+ out_nomap:
+ 	mem_cgroup_cancel_charge_swapin(ptr);
+@@ -3203,7 +3194,6 @@ out_release:
+ 		unlock_page(swapcache);
+ 		page_cache_release(swapcache);
+ 	}
+-	wakeup_wq(has_cma);
+ 	return ret;
+ }
+ 
+@@ -3345,7 +3335,7 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
+ 	struct vm_fault vmf;
+ 	int ret;
+ 	int page_mkwrite = 0;
+-	bool has_cma = false;
++
+ 	/*
+ 	 * If we do COW later, allocate page befor taking lock_page()
+ 	 * on the file cache page. This will reduce lock holding time.
+@@ -3383,8 +3373,6 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
+ 		page_cache_release(vmf.page);
+ 		goto uncharge_out;
+ 	}
+-	if (!has_cma)
+-		has_cma = has_cma_page(vmf.page);
+ 
+ 	/*
+ 	 * For consistency in subsequent calls, make the faulted page always
+@@ -3508,12 +3496,10 @@ static int __do_fault(struct mm_struct *mm, struct vm_area_struct *vma,
+ 			page_cache_release(vmf.page);
+ 	}
+ 
+-	wakeup_wq(has_cma);
+ 	return ret;
+ 
+ unwritable_page:
+ 	page_cache_release(page);
+-	wakeup_wq(has_cma);
+ 	return ret;
+ uncharge_out:
+ 	/* fs's fault handler get error */
+diff --git a/mm/migrate.c b/mm/migrate.c
+index 88c86c828269..ae10044bdfa5 100644
+--- a/mm/migrate.c
++++ b/mm/migrate.c
+@@ -37,7 +37,6 @@
+ #include <linux/hugetlb_cgroup.h>
+ #include <linux/gfp.h>
+ #include <linux/balloon_compaction.h>
+-#include <linux/page-isolation.h>
+ #include <linux/mmu_notifier.h>
+ 
+ #include <asm/tlbflush.h>
+@@ -947,25 +946,6 @@ uncharge:
+ 				 (rc == MIGRATEPAGE_SUCCESS ||
+ 				  rc == MIGRATEPAGE_BALLOON_SUCCESS));
+ 	unlock_page(page);
+-#ifdef CONFIG_CMA
+-	if ((force && rc == -EAGAIN) && (mode == MIGRATE_SYNC)) {
+-		DECLARE_WAITQUEUE(wait, current);
+-		if (migrate_status == MIGRATE_CMA_HOLD ||
+-		   migrate_status == MIGRATE_CMA_ALLOC) {
+-			mutex_lock(&migrate_wait);
+-			migrate_status = MIGRATE_CMA_ALLOC;
+-			init_waitqueue_head(&migrate_wq);
+-			add_wait_queue(&migrate_wq, &wait);
+-			mutex_unlock(&migrate_wait);
+-
+-			schedule_timeout_interruptible(20);
+-
+-			mutex_lock(&migrate_wait);
+-			remove_wait_queue(&migrate_wq, &wait);
+-			mutex_unlock(&migrate_wait);
+-		}
+-	}
+-#endif
+ out:
+ 	return rc;
+ }
+diff --git a/mm/oom_kill.c b/mm/oom_kill.c
+index 22b628fb08ba..171c00f2e495 100644
+--- a/mm/oom_kill.c
++++ b/mm/oom_kill.c
+@@ -1,6 +1,6 @@
+ /*
+  *  linux/mm/oom_kill.c
+- *
++ * 
+  *  Copyright (C)  1998,2000  Rik van Riel
+  *	Thanks go out to Claus Fischer for some serious inspiration and
+  *	for goading me into coding this file...
+@@ -467,11 +467,6 @@ void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
+ 	 */
+ 	read_lock(&tasklist_lock);
+ 	for_each_thread(p, t) {
+-		if (p->flags & PF_EXITING) {
+-			pr_err("%s:  process %d (%s) has been exiting\n",
+-				message, task_pid_nr(p), p->comm);
+-			break;
+-		}
+ 		list_for_each_entry(child, &t->children, sibling) {
+ 			unsigned int child_points;
+ 
+@@ -491,11 +486,6 @@ void oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
+ 		}
+ 	}
+ 	read_unlock(&tasklist_lock);
+-	if (p->flags & PF_EXITING) {
+-		set_tsk_thread_flag(p, TIF_MEMDIE);
+-		put_task_struct(p);
+-		return;
+-	}
+ 
+ 	p = find_lock_task_mm(victim);
+ 	if (!p) {
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 08d4f8b75152..eaafaf612832 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -990,10 +990,6 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
+ 
+ 		page = list_entry(area->free_list[migratetype].next,
+ 							struct page, lru);
+-#ifdef CONFIG_CMA
+-		if (is_migrate_isolate(get_pageblock_migratetype(page)))
+-			continue;
+-#endif
+ 		list_del(&page->lru);
+ 		rmv_page_order(page);
+ 		area->nr_free--;
+@@ -6469,7 +6465,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 		       unsigned migratetype)
+ {
+ 	unsigned long outer_start, outer_end;
+-	int ret = 0, order, try_times = 0;
++	int ret = 0, order;
+ 
+ 	struct compact_control cc = {
+ 		.nr_migratepages = 0,
+@@ -6510,7 +6506,6 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 	if (ret)
+ 		return ret;
+ 
+-try_again:
+ 	ret = __alloc_contig_migrate_range(&cc, start, end);
+ 	if (ret)
+ 		goto done;
+@@ -6540,9 +6535,6 @@ try_again:
+ 	while (!PageBuddy(pfn_to_page(outer_start))) {
+ 		if (++order >= MAX_ORDER) {
+ 			ret = -EBUSY;
+-			try_times++;
+-			if (try_times < 10)
+-				goto try_again;
+ 			goto done;
+ 		}
+ 		outer_start &= ~0UL << order;
+@@ -6552,9 +6544,6 @@ try_again:
+ 	if (test_pages_isolated(outer_start, end, false)) {
+ 		pr_warn("alloc_contig_range test_pages_isolated(%lx, %lx) failed\n",
+ 		       outer_start, end);
+-		try_times++;
+-		if (try_times < 10)
+-			goto try_again;
+ 		ret = -EBUSY;
+ 		goto done;
+ 	}
+diff --git a/mm/page_isolation.c b/mm/page_isolation.c
+index 907ab5f6dea5..88bdbf48cf6c 100644
+--- a/mm/page_isolation.c
++++ b/mm/page_isolation.c
+@@ -3,22 +3,12 @@
+  */
+ 
+ #include <linux/mm.h>
+-#include <linux/pagemap.h>
+ #include <linux/page-isolation.h>
+ #include <linux/pageblock-flags.h>
+ #include <linux/memory.h>
+ #include <linux/hugetlb.h>
+-#include <linux/sched.h>
+ #include "internal.h"
+ 
+-int iso_status = 0;
+-EXPORT_SYMBOL(iso_status);
+-int iso_recount = 0;
+-EXPORT_SYMBOL(iso_recount);
+-wait_queue_head_t iso_wq;
+-EXPORT_SYMBOL(iso_wq);
+-DEFINE_MUTEX(iso_wait);
+-EXPORT_SYMBOL(iso_wait);
+ int set_migratetype_isolate(struct page *page, bool skip_hwpoisoned_pages)
+ {
+ 	struct zone *zone;
+@@ -221,11 +211,11 @@ __test_page_isolated_in_pageblock(unsigned long pfn, unsigned long end_pfn,
+ 			continue;
+ 		}
+ 		else
+-			return -EBUSY;
++			break;
+ 	}
+ 	if (pfn < end_pfn)
+-		return 1;
+-	return 0;
++		return 0;
++	return 1;
+ }
+ 
+ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
+@@ -255,40 +245,14 @@ int test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn,
+ 	ret = __test_page_isolated_in_pageblock(start_pfn, end_pfn,
+ 						skip_hwpoisoned_pages);
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+-	if (ret == -EBUSY) {
+-		DECLARE_WAITQUEUE(wait, current);
+-		if (iso_status == MIGRATE_CMA_HOLD ||
+-		   iso_status == MIGRATE_CMA_ALLOC) {
+-			mutex_lock(&iso_wait);
+-			iso_status = MIGRATE_CMA_ALLOC;
+-			init_waitqueue_head(&iso_wq);
+-			add_wait_queue(&iso_wq, &wait);
+-			mutex_unlock(&iso_wait);
+-
+-			schedule_timeout_interruptible(20);
+-
+-			mutex_lock(&iso_wait);
+-			remove_wait_queue(&iso_wq, &wait);
+-			mutex_unlock(&iso_wait);
+-		}
+-	}
+-
+-	return ret ? -EBUSY : 0;
++	return ret ? 0 : -EBUSY;
+ }
+ 
+ struct page *alloc_migrate_target(struct page *page, unsigned long private,
+ 				  int **resultp)
+ {
+ 	gfp_t gfp_mask = GFP_USER | __GFP_MOVABLE;
+-#ifdef CONFIG_CMA
+-	struct address_space *mapping = NULL;
+ 
+-	mapping = page_mapping(page);
+-	if ((unsigned long)mapping & PAGE_MAPPING_ANON)
+-		mapping = NULL;
+-	if (mapping)
+-		gfp_mask |= (mapping_gfp_mask(mapping) & __GFP_BDEV);
+-#endif
+ 	/*
+ 	 * TODO: allocate a destination hugepage from a nearest neighbor node,
+ 	 * accordance with memory policy of the user process if possible. For
+diff --git a/mm/readahead.c b/mm/readahead.c
+index 98638a06c053..0ca36a7770b1 100644
+--- a/mm/readahead.c
++++ b/mm/readahead.c
+@@ -18,7 +18,6 @@
+ #include <linux/syscalls.h>
+ #include <linux/file.h>
+ 
+-#include <linux/page-isolation.h>
+ #include "internal.h"
+ 
+ /*
+@@ -161,9 +160,7 @@ int __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+ 	int page_idx;
+ 	int ret = 0;
+ 	loff_t isize = i_size_read(inode);
+-#ifdef CONFIG_CMA
+-	bool has_cma = false;
+-#endif
++
+ 	if (isize == 0)
+ 		goto out;
+ 
+@@ -187,17 +184,6 @@ int __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+ 		page = page_cache_alloc_readahead(mapping);
+ 		if (!page)
+ 			break;
+-#ifdef CONFIG_CMA
+-		if (!has_cma &&
+-			(is_migrate_cma(get_pageblock_migratetype(page)) ||
+-		   is_migrate_isolate(get_pageblock_migratetype(page)))) {
+-			if (iso_status != MIGRATE_CMA_ALLOC)
+-				iso_status = MIGRATE_CMA_HOLD;
+-			iso_recount++;
+-			has_cma = true;
+-			has_cma_page(page);
+-		}
+-#endif
+ 		page->index = page_offset;
+ 		list_add(&page->lru, &page_pool);
+ 		if (page_idx == nr_to_read - lookahead_size)
+@@ -212,23 +198,6 @@ int __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+ 	 */
+ 	if (ret)
+ 		read_pages(mapping, filp, &page_pool, ret);
+-#ifdef CONFIG_CMA
+-	if (has_cma) {
+-		if (iso_recount > 0) {
+-
+-			mutex_lock(&iso_wait);
+-			iso_recount--;
+-			if (!iso_recount) {
+-				if (iso_status == MIGRATE_CMA_ALLOC) {
+-					wake_up_interruptible(&iso_wq);
+-					iso_status = MIGRATE_CMA_REL;
+-				}
+-			}
+-			mutex_unlock(&iso_wait);
+-		}
+-		wakeup_wq(has_cma);
+-	}
+-#endif
+ 	BUG_ON(!list_empty(&page_pool));
+ out:
+ 	return ret;
+diff --git a/mm/shmem.c b/mm/shmem.c
+index 19972bd2f466..879edba9bf43 100644
+--- a/mm/shmem.c
++++ b/mm/shmem.c
+@@ -1018,7 +1018,6 @@ static int shmem_getpage_gfp(struct inode *inode, pgoff_t index,
+ 	int error;
+ 	int once = 0;
+ 	int alloced = 0;
+-	bool has_cma = false;
+ 
+ 	if (index > (MAX_LFS_FILESIZE >> PAGE_CACHE_SHIFT))
+ 		return -EFBIG;
+@@ -1029,8 +1028,6 @@ repeat:
+ 		swap = radix_to_swp_entry(page);
+ 		page = NULL;
+ 	}
+-	if (page && !has_cma)
+-		has_cma = has_cma_page(page);
+ 
+ 	if (sgp != SGP_WRITE && sgp != SGP_FALLOC &&
+ 	    ((loff_t)index << PAGE_CACHE_SHIFT) >= i_size_read(inode)) {
+@@ -1051,7 +1048,6 @@ repeat:
+ 	}
+ 	if (page || (sgp == SGP_READ && !swap.val)) {
+ 		*pagep = page;
+-		wakeup_wq(has_cma);
+ 		return 0;
+ 	}
+ 
+@@ -1075,8 +1071,6 @@ repeat:
+ 				goto failed;
+ 			}
+ 		}
+-		if (page && !has_cma)
+-			has_cma = has_cma_page(page);
+ 
+ 		/* We have to do this with page locked to prevent races */
+ 		lock_page(page);
+@@ -1151,8 +1145,6 @@ repeat:
+ 			error = -ENOMEM;
+ 			goto decused;
+ 		}
+-		if (page && !has_cma)
+-			has_cma = has_cma_page(page);
+ 
+ 		__SetPageSwapBacked(page);
+ 		__set_page_locked(page);
+@@ -1212,7 +1204,6 @@ clear:
+ 			goto failed;
+ 	}
+ 	*pagep = page;
+-	wakeup_wq(has_cma);
+ 	return 0;
+ 
+ 	/*
+@@ -1241,8 +1232,6 @@ unlock:
+ 		unlock_page(page);
+ 		page_cache_release(page);
+ 	}
+-	wakeup_wq(has_cma);
+-	has_cma = false;
+ 	if (error == -ENOSPC && !once++) {
+ 		info = SHMEM_I(inode);
+ 		spin_lock(&info->lock);
+@@ -1495,7 +1484,6 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
+ 	pgoff_t index;
+ 	unsigned long offset;
+ 	enum sgp_type sgp = SGP_READ;
+-	bool has_cma = false;
+ 
+ 	/*
+ 	 * Might this read be for a stacking filesystem?  Then when reading
+@@ -1532,8 +1520,6 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
+ 		if (page)
+ 			unlock_page(page);
+ 
+-		if (page && !has_cma)
+-			has_cma = has_cma_page(page);
+ 		/*
+ 		 * We must evaluate after, since reads (unlike writes)
+ 		 * are called without i_mutex protection against truncate
+@@ -1591,7 +1577,6 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
+ 		cond_resched();
+ 	}
+ 
+-	wakeup_wq(has_cma);
+ 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
+ 	file_accessed(filp);
+ }
+diff --git a/mm/swap_state.c b/mm/swap_state.c
+index 272c9f718c48..2972eee184a4 100644
+--- a/mm/swap_state.c
++++ b/mm/swap_state.c
+@@ -160,7 +160,7 @@ void __delete_from_swap_cache(struct page *page)
+  * @page: page we want to move to swap
+  *
+  * Allocate swap space for the page and add the page to the
+- * swap cache.  Caller needs to hold the page lock.
++ * swap cache.  Caller needs to hold the page lock. 
+  */
+ int add_to_swap(struct page *page, struct list_head *list)
+ {
+@@ -229,9 +229,9 @@ void delete_from_swap_cache(struct page *page)
+ 	page_cache_release(page);
+ }
+ 
+-/*
+- * If we are the only user, then try to free up the swap cache.
+- *
++/* 
++ * If we are the only user, then try to free up the swap cache. 
++ * 
+  * Its ok to check for PageSwapCache without the page lock
+  * here because we are going to recheck again inside
+  * try_to_free_swap() _with_ the lock.
+@@ -245,7 +245,7 @@ static inline void free_swap_cache(struct page *page)
+ 	}
+ }
+ 
+-/*
++/* 
+  * Perform a free_page(), also freeing any swap cache associated with
+  * this page if it is the last user of the page.
+  */
+@@ -298,7 +298,7 @@ struct page * lookup_swap_cache(swp_entry_t entry)
+ 	return page;
+ }
+ 
+-/*
++/* 
+  * Locate a page of swap in physical memory, reserving swap cache space
+  * and reading the disk if it is not already cached.
+  * A failure return means that either the page allocation failed or that
+@@ -309,7 +309,6 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
+ {
+ 	struct page *found_page, *new_page = NULL;
+ 	int err;
+-	bool has_cma = false;
+ 
+ 	do {
+ 		/*
+@@ -330,8 +329,6 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
+ 			if (!new_page)
+ 				break;		/* Out of memory */
+ 		}
+-		if (!has_cma)
+-			has_cma = has_cma_page(new_page);
+ 
+ 		/*
+ 		 * call radix_tree_preload() while we can wait.
+@@ -380,7 +377,6 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
+ 			 */
+ 			lru_cache_add_anon(new_page);
+ 			swap_readpage(new_page);
+-			wakeup_wq(has_cma);
+ 			return new_page;
+ 		}
+ 		radix_tree_preload_end();
+@@ -393,10 +389,8 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
+ 		swapcache_free(entry, NULL);
+ 	} while (err != -ENOMEM);
+ 
+-	if (new_page) {
+-		wakeup_wq(has_cma);
++	if (new_page)
+ 		page_cache_release(new_page);
+-	}
+ 	return found_page;
+ }
+ 
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 6640193a38f0..025352ddf105 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1201,22 +1201,6 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
+ int __isolate_lru_page(struct page *page, isolate_mode_t mode)
+ {
+ 	int ret = -EINVAL;
+-	unsigned long free_cma, total_free;
+-
+-	if (!(mode & ISOLATE_UNEVICTABLE)) {
+-#if 1
+-		free_cma = global_page_state(NR_FREE_CMA_PAGES);
+-		free_cma += free_cma << 1;
+-		total_free = global_page_state(NR_FREE_PAGES);
+-		if (page) {
+-			if ((free_cma > total_free) &&
+-				is_migrate_cma(
+-					   get_pageblock_migratetype(page))) {
+-				return -EBUSY;
+-			}
+-		}
+-#endif
+-	}
+ 
+ 	/* Only take pages on the LRU. */
+ 	if (!PageLRU(page))
+@@ -1501,10 +1485,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	int file = is_file_lru(lru);
+ 	struct zone *zone = lruvec_zone(lruvec);
+ 	struct zone_reclaim_stat *reclaim_stat = &lruvec->reclaim_stat;
+-#ifdef CONFIG_CMA
+-	struct page *page = NULL;
+-	bool has_cma = false;
+-#endif
++
+ 	while (unlikely(too_many_isolated(zone, file, sc))) {
+ 		congestion_wait(BLK_RW_ASYNC, HZ/10);
+ 
+@@ -1540,15 +1521,6 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	if (nr_taken == 0)
+ 		return 0;
+ 
+-#ifdef CONFIG_CMA
+-	list_for_each_entry(page, &page_list, lru) {
+-		if (page) {
+-			has_cma = has_cma_page(page);
+-			if (has_cma)
+-				break;
+-		}
+-	}
+-#endif
+ 	nr_reclaimed = shrink_page_list(&page_list, zone, sc, TTU_UNMAP,
+ 				&nr_dirty, &nr_unqueued_dirty, &nr_congested,
+ 				&nr_writeback, &nr_immediate,
+@@ -1574,9 +1546,7 @@ shrink_inactive_list(unsigned long nr_to_scan, struct lruvec *lruvec,
+ 	spin_unlock_irq(&zone->lru_lock);
+ 
+ 	free_hot_cold_page_list(&page_list, true);
+-#ifdef CONFIG_CMA
+-	wakeup_wq(has_cma);
+-#endif
++
+ 	/*
+ 	 * If reclaim is isolating dirty pages under writeback, it implies
+ 	 * that the long-lived page allocation rate is exceeding the page
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index 506ffb3a9ee6..9ac664d8da33 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -358,19 +358,14 @@ static void *__netdev_alloc_frag(unsigned int fragsz, gfp_t gfp_mask)
+ {
+ 	struct netdev_alloc_cache *nc;
+ 	void *data = NULL;
+-	int order, tmp_order = NETDEV_FRAG_PAGE_MAX_ORDER;
+-	unsigned int tmp_count = NETDEV_PAGECNT_MAX_BIAS;
++	int order;
+ 	unsigned long flags;
+ 
+ 	local_irq_save(flags);
+ 	nc = &__get_cpu_var(netdev_alloc_cache);
+-	if (fragsz <= PAGE_SIZE) {
+-		tmp_order = 0;
+-		tmp_count >>= 3;
+-	}
+ 	if (unlikely(!nc->frag.page)) {
+ refill:
+-		for (order = tmp_order; ;) {
++		for (order = NETDEV_FRAG_PAGE_MAX_ORDER; ;) {
+ 			gfp_t gfp = gfp_mask;
+ 
+ 			if (order) {
+@@ -386,8 +381,8 @@ refill:
+ 		}
+ 		nc->frag.size = PAGE_SIZE << order;
+ recycle:
+-		atomic_set(&nc->frag.page->_count, tmp_count);
+-		nc->pagecnt_bias = tmp_count;
++		atomic_set(&nc->frag.page->_count, NETDEV_PAGECNT_MAX_BIAS);
++		nc->pagecnt_bias = NETDEV_PAGECNT_MAX_BIAS;
+ 		nc->frag.offset = 0;
+ 	}
+ 
+
+From da38a9567bf32d3b3effa426478d6072c8f51d11 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 20 Jan 2017 22:35:23 +0100
+Subject: [PATCH 16/16] Revert "mm: optimize CMA for allocation"
+
+This reverts commit c18fa6d12e2ac8055e91f47f14f3f83ba65ada30.
+---
+ fs/block_dev.c         |  10 ++--
+ include/linux/gfp.h    |   5 +-
+ include/linux/mmzone.h |  11 +---
+ kernel/sysctl.c        |  10 ----
+ mm/page_alloc.c        | 139 +++++--------------------------------------------
+ mm/vmscan.c            |   2 -
+ 6 files changed, 23 insertions(+), 154 deletions(-)
+
+diff --git a/fs/block_dev.c b/fs/block_dev.c
+index 200ec0e2bd65..1e86823a9cbd 100644
+--- a/fs/block_dev.c
++++ b/fs/block_dev.c
+@@ -88,7 +88,7 @@ void kill_bdev(struct block_device *bdev)
+ 
+ 	invalidate_bh_lrus();
+ 	truncate_inode_pages(mapping, 0);
+-}
++}	
+ EXPORT_SYMBOL(kill_bdev);
+ 
+ /* Invalidate clean unused buffers and pagecache. */
+@@ -339,13 +339,13 @@ static loff_t block_llseek(struct file *file, loff_t offset, int whence)
+ 	mutex_unlock(&bd_inode->i_mutex);
+ 	return retval;
+ }
+-
++	
+ int blkdev_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
+ {
+ 	struct inode *bd_inode = filp->f_mapping->host;
+ 	struct block_device *bdev = I_BDEV(bd_inode);
+ 	int error;
+-
++	
+ 	error = filemap_write_and_wait_range(filp->f_mapping, start, end);
+ 	if (error)
+ 		return error;
+@@ -517,7 +517,7 @@ struct block_device *bdget(dev_t dev)
+ 		inode->i_rdev = dev;
+ 		inode->i_bdev = bdev;
+ 		inode->i_data.a_ops = &def_blk_aops;
+-		mapping_set_gfp_mask(&inode->i_data, GFP_USER | __GFP_BDEV);
++		mapping_set_gfp_mask(&inode->i_data, GFP_USER);
+ 		inode->i_data.backing_dev_info = &default_backing_dev_info;
+ 		spin_lock(&bdev_lock);
+ 		list_add(&bdev->bd_list, &all_bdevs);
+@@ -558,7 +558,7 @@ void bdput(struct block_device *bdev)
+ }
+ 
+ EXPORT_SYMBOL(bdput);
+-
++ 
+ static struct block_device *bd_acquire(struct inode *inode)
+ {
+ 	struct block_device *bdev;
+diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+index faf8af5a7f95..3824ac62f395 100644
+--- a/include/linux/gfp.h
++++ b/include/linux/gfp.h
+@@ -36,7 +36,6 @@ struct vm_area_struct;
+ #define ___GFP_NO_KSWAPD	0x400000u
+ #define ___GFP_OTHER_NODE	0x800000u
+ #define ___GFP_WRITE		0x1000000u
+-#define ___GFP_BDEV		0x2000000u
+ /* If the above are modified, __GFP_BITS_SHIFT may need updating */
+ 
+ /*
+@@ -94,14 +93,14 @@ struct vm_area_struct;
+ #define __GFP_OTHER_NODE ((__force gfp_t)___GFP_OTHER_NODE) /* On behalf of other node */
+ #define __GFP_KMEMCG	((__force gfp_t)___GFP_KMEMCG) /* Allocation comes from a memcg-accounted resource */
+ #define __GFP_WRITE	((__force gfp_t)___GFP_WRITE)	/* Allocator intends to dirty page */
+-#define __GFP_BDEV ((__force gfp_t)___GFP_BDEV)
++
+ /*
+  * This may seem redundant, but it's a way of annotating false positives vs.
+  * allocations that simply cannot be supported (e.g. page tables).
+  */
+ #define __GFP_NOTRACK_FALSE_POSITIVE (__GFP_NOTRACK)
+ 
+-#define __GFP_BITS_SHIFT 26	/* Room for N __GFP_FOO bits */
++#define __GFP_BITS_SHIFT 25	/* Room for N __GFP_FOO bits */
+ #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
+ 
+ /* This equals 0, but use constants in case they ever change */
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index 2fa9a28a2920..ac819bf9522c 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -18,7 +18,6 @@
+ #include <linux/page-flags-layout.h>
+ #include <linux/atomic.h>
+ #include <asm/page.h>
+-#include <linux/sysctl.h>
+ 
+ /* Free memory management - zoned buddy allocator.  */
+ #ifndef CONFIG_FORCE_MAX_ZONEORDER
+@@ -93,7 +92,6 @@ static inline int get_pfnblock_migratetype(struct page *page, unsigned long pfn)
+ struct free_area {
+ 	struct list_head	free_list[MIGRATE_TYPES];
+ 	unsigned long		nr_free;
+-	unsigned long		nr_free_cma;
+ };
+ 
+ struct pglist_data;
+@@ -838,12 +836,7 @@ extern int init_currently_empty_zone(struct zone *zone, unsigned long start_pfn,
+ 				     enum memmap_context context);
+ 
+ extern void lruvec_init(struct lruvec *lruvec);
+-#define START_KSWAPD_FREE_PAGE_THRESH 16384
+-extern int mem_management_thresh;
+-extern int proc_mem_management_thresh_handler(
+-		struct ctl_table *table, int write,
+-		void __user *buffer, size_t *lenp,
+-		loff_t *ppos);
++
+ static inline struct zone *lruvec_zone(struct lruvec *lruvec)
+ {
+ #ifdef CONFIG_MEMCG
+@@ -901,7 +894,7 @@ static inline int is_highmem_idx(enum zone_type idx)
+ }
+ 
+ /**
+- * is_highmem - helper function to quickly check if a struct zone is a
++ * is_highmem - helper function to quickly check if a struct zone is a 
+  *              highmem zone or not.  This is an attempt to keep references
+  *              to ZONE_{DMA/NORMAL/HIGHMEM/etc} in general code to a minimum.
+  * @zone - pointer to struct zone variable
+diff --git a/kernel/sysctl.c b/kernel/sysctl.c
+index 22d7017058b3..4f2229ae1fca 100644
+--- a/kernel/sysctl.c
++++ b/kernel/sysctl.c
+@@ -131,7 +131,6 @@ static int __maybe_unused two = 2;
+ static int __maybe_unused three = 3;
+ static unsigned long one_ul = 1;
+ static int one_hundred = 100;
+-static int mem_thresh = 65536;
+ #ifdef CONFIG_PRINTK
+ static int ten_thousand = 10000;
+ #endif
+@@ -1540,15 +1539,6 @@ static struct ctl_table vm_table[] = {
+ 		.extra2		= (void *)&mmap_rnd_compat_bits_max,
+ 	},
+ #endif
+-	{
+-		.procname	= "mem_management_thresh",
+-		.data		= &mem_management_thresh,
+-		.maxlen		= sizeof(mem_management_thresh),
+-		.mode		= 0666,
+-		.proc_handler	= proc_mem_management_thresh_handler,
+-		.extra1		= &zero,
+-		.extra2		= &mem_thresh,
+-	},
+ #ifdef CONFIG_CHECK_ISR_TIME
+ 	{
+ 		.procname	= "irq_times_stat",
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index eaafaf612832..e7debdadd19e 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -257,18 +257,7 @@ void set_pageblock_migratetype(struct page *page, int migratetype)
+ }
+ 
+ bool oom_killer_disabled __read_mostly;
+-int mem_management_thresh = START_KSWAPD_FREE_PAGE_THRESH;
+-int proc_mem_management_thresh_handler(struct ctl_table *table, int write,
+-		void __user *buffer, size_t *lenp,
+-		loff_t *ppos)
+-{
+-	int ret;
+ 
+-	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+-	if (ret && write)
+-		mem_management_thresh = START_KSWAPD_FREE_PAGE_THRESH;
+-	return ret;
+-}
+ #ifdef CONFIG_DEBUG_VM
+ static int page_outside_zone_boundaries(struct zone *zone, struct page *page)
+ {
+@@ -624,8 +613,6 @@ static inline void __free_one_page(struct page *page,
+ 			list_del(&buddy->lru);
+ 			zone->free_area[order].nr_free--;
+ 			rmv_page_order(buddy);
+-			if (is_migrate_cma(get_pageblock_migratetype(buddy)))
+-				zone->free_area[order].nr_free_cma--;
+ 		}
+ 		combined_idx = buddy_idx & page_idx;
+ 		page = page + (combined_idx - page_idx);
+@@ -658,8 +645,6 @@ static inline void __free_one_page(struct page *page,
+ 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
+ out:
+ 	zone->free_area[order].nr_free++;
+-	if (is_migrate_cma(migratetype))
+-		zone->free_area[order].nr_free_cma++;
+ }
+ 
+ static inline int free_pages_check(struct page *page)
+@@ -741,7 +726,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+ 			page = list_entry(list->prev, struct page, lru);
+ 			/* must delete as __free_one_page list manipulates */
+ 			list_del(&page->lru);
+-			mt = get_pageblock_migratetype(page);
++			mt = get_freepage_migratetype(page);
+ 			/* MIGRATE_MOVABLE list may include MIGRATE_RESERVEs */
+ 			__free_one_page(page, page_to_pfn(page), zone, 0, mt);
+ 			trace_mm_page_pcpu_drain(page, 0, mt);
+@@ -912,8 +897,6 @@ static inline void expand(struct zone *zone, struct page *page,
+ #endif
+ 		list_add(&page[size].lru, &area->free_list[migratetype]);
+ 		area->nr_free++;
+-		if (is_migrate_cma(migratetype))
+-			area->nr_free_cma++;
+ 		set_page_order(&page[size], high);
+ 	}
+ }
+@@ -993,8 +976,6 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
+ 		list_del(&page->lru);
+ 		rmv_page_order(page);
+ 		area->nr_free--;
+-		if (is_migrate_cma(migratetype))
+-			area->nr_free_cma--;
+ 		expand(zone, page, order, current_order, area, migratetype);
+ 		set_freepage_migratetype(page, migratetype);
+ 		return page;
+@@ -1064,12 +1045,6 @@ int move_freepages(struct zone *zone,
+ 		order = page_order(page);
+ 		list_move(&page->lru,
+ 			  &zone->free_area[order].free_list[migratetype]);
+-#ifdef CONFIG_CMA
+-		if (migratetype == MIGRATE_ISOLATE)
+-			zone->free_area[order].nr_free_cma--;
+-		if (migratetype == MIGRATE_CMA)
+-			zone->free_area[order].nr_free_cma++;
+-#endif
+ 		set_freepage_migratetype(page, migratetype);
+ 		page += 1 << order;
+ 		pages_moved += 1 << order;
+@@ -1158,11 +1133,7 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
+ 	struct free_area *area;
+ 	unsigned int current_order;
+ 	struct page *page;
+-#ifdef CONFIG_CMA
+-	int flags = start_migratetype & __GFP_BDEV;
+-#endif
+ 
+-	start_migratetype &= (~__GFP_BDEV);
+ 	/* Find the largest possible block of pages in the other list */
+ 	for (current_order = MAX_ORDER-1;
+ 				current_order >= order && current_order <= MAX_ORDER-1;
+@@ -1175,10 +1146,7 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
+ 			/* MIGRATE_RESERVE handled later if necessary */
+ 			if (migratetype == MIGRATE_RESERVE)
+ 				break;
+-#ifdef CONFIG_CMA
+-			if (flags && migratetype == MIGRATE_CMA)
+-				continue;
+-#endif
++
+ 			area = &(zone->free_area[current_order]);
+ 			if (list_empty(&area->free_list[migratetype]))
+ 				continue;
+@@ -1186,8 +1154,6 @@ __rmqueue_fallback(struct zone *zone, unsigned int order, int start_migratetype)
+ 			page = list_entry(area->free_list[migratetype].next,
+ 					struct page, lru);
+ 			area->nr_free--;
+-			if (is_migrate_cma(migratetype))
+-				area->nr_free_cma--;
+ 
+ 			if (!is_migrate_cma(migratetype)) {
+ 				try_to_steal_freepages(zone, page,
+@@ -1238,40 +1204,11 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order,
+ 						int migratetype)
+ {
+ 	struct page *page;
+-	int ori_migratetype = migratetype;
+-#ifdef CONFIG_CMA
+-	int i = 0;
+-	int tmp_migratetype = MIGRATE_RESERVE;
+-	int flags = migratetype & __GFP_BDEV;
+-#endif
+ 
+-#ifdef CONFIG_CMA
+-	if (flags)
+-		ori_migratetype &= ~__GFP_BDEV;
+-	if (ori_migratetype == MIGRATE_MOVABLE) {
+-		for (i = 0;; i++) {
+-			tmp_migratetype = fallbacks[ori_migratetype][i];
+-			if (tmp_migratetype == MIGRATE_CMA) {
+-				if (flags)
+-					tmp_migratetype = MIGRATE_RESERVE;
+-				break;
+-			}
+-			if (tmp_migratetype == MIGRATE_RESERVE)
+-				break;
+-		}
+-		if (tmp_migratetype == MIGRATE_CMA) {
+-			page = __rmqueue_smallest(zone, order, MIGRATE_CMA);
+-			if (page) {
+-				ori_migratetype = MIGRATE_CMA;
+-				goto alloc_page_success;
+-			}
+-		}
+-	}
+-#endif
+ retry_reserve:
+-	page = __rmqueue_smallest(zone, order, ori_migratetype);
++	page = __rmqueue_smallest(zone, order, migratetype);
+ 
+-	if (unlikely(!page) && ori_migratetype != MIGRATE_RESERVE) {
++	if (unlikely(!page) && migratetype != MIGRATE_RESERVE) {
+ 		page = __rmqueue_fallback(zone, order, migratetype);
+ 
+ 		/*
+@@ -1280,14 +1217,12 @@ retry_reserve:
+ 		 * and we want just one call site
+ 		 */
+ 		if (!page) {
+-			ori_migratetype = MIGRATE_RESERVE;
++			migratetype = MIGRATE_RESERVE;
+ 			goto retry_reserve;
+ 		}
+ 	}
+-#ifdef CONFIG_CMA
+-alloc_page_success:
+-#endif
+-	trace_mm_page_alloc_zone_locked(page, order, ori_migratetype);
++
++	trace_mm_page_alloc_zone_locked(page, order, migratetype);
+ 	return page;
+ }
+ 
+@@ -1504,8 +1439,7 @@ void free_hot_cold_page(struct page *page, bool cold)
+ 	 * excessively into the page allocator
+ 	 */
+ 	if (migratetype >= MIGRATE_PCPTYPES) {
+-		if (unlikely(is_migrate_isolate(migratetype))
+-			|| unlikely(is_migrate_cma(migratetype))) {
++		if (unlikely(is_migrate_isolate(migratetype))) {
+ 			free_one_page(zone, page, pfn, 0, migratetype);
+ 			goto out;
+ 		}
+@@ -1594,8 +1528,7 @@ static int __isolate_free_page(struct page *page, unsigned int order)
+ 	list_del(&page->lru);
+ 	zone->free_area[order].nr_free--;
+ 	rmv_page_order(page);
+-	if (is_migrate_cma(mt))
+-		zone->free_area[order].nr_free_cma--;
++
+ 	/* Set the pageblock if the isolated page is at least a pageblock */
+ 	if (order >= pageblock_order - 1) {
+ 		struct page *endpage = page + (1 << order) - 1;
+@@ -1660,17 +1593,9 @@ again:
+ 		pcp = &this_cpu_ptr(zone->pageset)->pcp;
+ 		list = &pcp->lists[migratetype];
+ 		if (list_empty(list)) {
+-#ifdef CONFIG_CMA
+-			if (gfp_flags & __GFP_BDEV)
+-				migratetype |= __GFP_BDEV;
+-#endif
+ 			pcp->count += rmqueue_bulk(zone, 0,
+ 					pcp->batch, list,
+ 					migratetype, cold);
+-#ifdef CONFIG_CMA
+-			if (gfp_flags & __GFP_BDEV)
+-				migratetype &= (~__GFP_BDEV);
+-#endif
+ 			if (unlikely(list_empty(list)))
+ 				goto failed;
+ 		}
+@@ -1679,22 +1604,7 @@ again:
+ 			page = list_entry(list->prev, struct page, lru);
+ 		else
+ 			page = list_entry(list->next, struct page, lru);
+-#ifdef CONFIG_CMA
+-		if (gfp_flags & __GFP_BDEV) {
+-			if (get_pageblock_migratetype(page) == MIGRATE_CMA) {
+-				spin_lock(&zone->lock);
+-				migratetype |= __GFP_BDEV;
+-				page = __rmqueue(zone, order, migratetype);
+-				migratetype &= (~__GFP_BDEV);
+-				spin_unlock(&zone->lock);
+-				if (!page)
+-					goto failed;
+-				__mod_zone_freepage_state(zone, -(1 << order),
+-					  get_pageblock_migratetype(page));
+-				goto alloc_sucess;
+-			}
+-		}
+-#endif
++
+ 		list_del(&page->lru);
+ 		pcp->count--;
+ 	} else {
+@@ -1717,11 +1627,9 @@ again:
+ 		if (!page)
+ 			goto failed;
+ 		__mod_zone_freepage_state(zone, -(1 << order),
+-					  get_pageblock_migratetype(page));
++					  get_freepage_migratetype(page));
+ 	}
+-#ifdef CONFIG_CMA
+-alloc_sucess:
+-#endif
++
+ 	__mod_zone_page_state(zone, NR_ALLOC_BATCH, -(1 << order));
+ 	if (zone_page_state(zone, NR_ALLOC_BATCH) == 0 &&
+ 	    !zone_is_fair_depleted(zone))
+@@ -1842,17 +1750,12 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
+ 		free_cma = zone_page_state(z, NR_FREE_CMA_PAGES);
+ #endif
+ 
+-	free_pages -= free_cma;
+-	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
++	if (free_pages - free_cma <= min + z->lowmem_reserve[classzone_idx])
+ 		return false;
+ 	for (o = 0; o < order; o++) {
+ 		/* At the next order, this order's pages become unavailable */
+ 		free_pages -= z->free_area[o].nr_free << o;
+-#ifdef CONFIG_CMA
+-	/* If allocation can't use CMA areas don't use free CMA pages */
+-	if (!(alloc_flags & ALLOC_CMA))
+-		free_pages += z->free_area[o].nr_free_cma << o;
+-#endif
++
+ 		/* Require fewer higher order pages to be free */
+ 		min >>= min_free_order_shift;
+ 
+@@ -1874,10 +1777,6 @@ bool zone_watermark_ok_safe(struct zone *z, unsigned int order,
+ {
+ 	long free_pages = zone_page_state(z, NR_FREE_PAGES);
+ 
+-	if (global_page_state(NR_FREE_PAGES)  -
+-		global_page_state(NR_FREE_CMA_PAGES)
+-	   < mem_management_thresh)
+-		return false;
+ 	if (z->percpu_drift_mark && free_pages < z->percpu_drift_mark)
+ 		free_pages = zone_page_state_snapshot(z, NR_FREE_PAGES);
+ 
+@@ -2932,13 +2831,6 @@ retry_cpuset:
+ 	if (allocflags_to_migratetype(gfp_mask) == MIGRATE_MOVABLE)
+ 		alloc_flags |= ALLOC_CMA;
+ #endif
+-retry:
+-	if (global_page_state(NR_FREE_PAGES)  -
+-		global_page_state(NR_FREE_CMA_PAGES)
+-	   < mem_management_thresh)
+-		if (!(gfp_mask & __GFP_NO_KSWAPD))
+-			wake_all_kswapds(order, zonelist, high_zoneidx,
+-							preferred_zone);
+ 	/* First allocation attempt */
+ 	page = get_page_from_freelist(gfp_mask|__GFP_HARDWALL, nodemask, order,
+ 			zonelist, high_zoneidx, alloc_flags,
+@@ -4284,7 +4176,6 @@ static void __meminit zone_init_free_lists(struct zone *zone)
+ 	for_each_migratetype_order(order, t) {
+ 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
+ 		zone->free_area[order].nr_free = 0;
+-		zone->free_area[order].nr_free_cma = 0;
+ 	}
+ }
+ 
+@@ -6664,8 +6555,6 @@ __offline_isolated_pages(unsigned long start_pfn, unsigned long end_pfn)
+ 		list_del(&page->lru);
+ 		rmv_page_order(page);
+ 		zone->free_area[order].nr_free--;
+-		if (is_migrate_cma(get_pageblock_migratetype(page)))
+-			zone->free_area[order].nr_free_cma--;
+ 		for (i = 0; i < (1 << order); i++)
+ 			SetPageReserved((page+i));
+ 		pfn += (1 << order);
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 025352ddf105..039ed2c7cd47 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1971,8 +1971,6 @@ static void get_scan_count(struct lruvec *lruvec, struct scan_control *sc,
+ 	 * This scanning priority is essentially the inverse of IO cost.
+ 	 */
+ 	anon_prio = vmscan_swappiness(sc);
+-	if (get_nr_swap_pages() * 3 < total_swap_pages)
+-		anon_prio >>= 1;
+ 	file_prio = 200 - anon_prio;
+ 
+ 	/*

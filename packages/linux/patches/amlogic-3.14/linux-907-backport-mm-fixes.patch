@@ -1,0 +1,1136 @@
+From 36e30938d09011a00b46de76d3bad46438b96a01 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Thu, 13 Nov 2014 15:19:11 -0800
+Subject: [PATCH 1/8] mm/page_alloc: fix incorrect isolation behavior by
+ rechecking migratetype
+
+Before describing bugs itself, I first explain definition of freepage.
+
+ 1. pages on buddy list are counted as freepage.
+ 2. pages on isolate migratetype buddy list are *not* counted as freepage.
+ 3. pages on cma buddy list are counted as CMA freepage, too.
+
+Now, I describe problems and related patch.
+
+Patch 1: There is race conditions on getting pageblock migratetype that
+it results in misplacement of freepages on buddy list, incorrect
+freepage count and un-availability of freepage.
+
+Patch 2: Freepages on pcp list could have stale cached information to
+determine migratetype of buddy list to go.  This causes misplacement of
+freepages on buddy list and incorrect freepage count.
+
+Patch 4: Merging between freepages on different migratetype of
+pageblocks will cause freepages accouting problem.  This patch fixes it.
+
+Without patchset [3], above problem doesn't happens on my CMA allocation
+test, because CMA reserved pages aren't used at all.  So there is no
+chance for above race.
+
+With patchset [3], I did simple CMA allocation test and get below
+result:
+
+ - Virtual machine, 4 cpus, 1024 MB memory, 256 MB CMA reservation
+ - run kernel build (make -j16) on background
+ - 30 times CMA allocation(8MB * 30 = 240MB) attempts in 5 sec interval
+ - Result: more than 5000 freepage count are missed
+
+With patchset [3] and this patchset, I found that no freepage count are
+missed so that I conclude that problems are solved.
+
+On my simple memory offlining test, these problems also occur on that
+environment, too.
+
+This patch (of 4):
+
+There are two paths to reach core free function of buddy allocator,
+__free_one_page(), one is free_one_page()->__free_one_page() and the
+other is free_hot_cold_page()->free_pcppages_bulk()->__free_one_page().
+Each paths has race condition causing serious problems.  At first, this
+patch is focused on first type of freepath.  And then, following patch
+will solve the problem in second type of freepath.
+
+In the first type of freepath, we got migratetype of freeing page
+without holding the zone lock, so it could be racy.  There are two cases
+of this race.
+
+ 1. pages are added to isolate buddy list after restoring orignal
+    migratetype
+
+    CPU1                                   CPU2
+
+    get migratetype => return MIGRATE_ISOLATE
+    call free_one_page() with MIGRATE_ISOLATE
+
+                                grab the zone lock
+                                unisolate pageblock
+                                release the zone lock
+
+    grab the zone lock
+    call __free_one_page() with MIGRATE_ISOLATE
+    freepage go into isolate buddy list,
+    although pageblock is already unisolated
+
+This may cause two problems.  One is that we can't use this page anymore
+until next isolation attempt of this pageblock, because freepage is on
+isolate buddy list.  The other is that freepage accouting could be wrong
+due to merging between different buddy list.  Freepages on isolate buddy
+list aren't counted as freepage, but ones on normal buddy list are
+counted as freepage.  If merge happens, buddy freepage on normal buddy
+list is inevitably moved to isolate buddy list without any consideration
+of freepage accouting so it could be incorrect.
+
+ 2. pages are added to normal buddy list while pageblock is isolated.
+    It is similar with above case.
+
+This also may cause two problems.  One is that we can't keep these
+freepages from being allocated.  Although this pageblock is isolated,
+freepage would be added to normal buddy list so that it could be
+allocated without any restriction.  And the other problem is same as
+case 1, that it, incorrect freepage accouting.
+
+This race condition would be prevented by checking migratetype again
+with holding the zone lock.  Because it is somewhat heavy operation and
+it isn't needed in common case, we want to avoid rechecking as much as
+possible.  So this patch introduce new variable, nr_isolate_pageblock in
+struct zone to check if there is isolated pageblock.  With this, we can
+avoid to re-check migratetype in common case and do it only if there is
+isolated pageblock or migratetype is MIGRATE_ISOLATE.  This solve above
+mentioned problems.
+
+Changes from v3:
+Add one more check in free_one_page() that checks whether migratetype is
+MIGRATE_ISOLATE or not. Without this, abovementioned case 1 could happens.
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Minchan Kim <minchan@kernel.org>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Cc: "Kirill A. Shutemov" <kirill@shutemov.name>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+Cc: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
+Cc: Tang Chen <tangchen@cn.fujitsu.com>
+Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Wen Congyang <wency@cn.fujitsu.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Heesub Shin <heesub.shin@samsung.com>
+Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+Cc: Ritesh Harjani <ritesh.list@gmail.com>
+Cc: Gioh Kim <gioh.kim@lge.com>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ include/linux/mmzone.h         |  9 +++++++++
+ include/linux/page-isolation.h |  8 ++++++++
+ mm/page_alloc.c                | 11 +++++++++--
+ mm/page_isolation.c            |  2 ++
+ 4 files changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index ac819bf9522c..e0a3faa9dbf3 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -429,6 +429,15 @@ struct zone {
+ 	 */
+ 	int			nr_migrate_reserve_block;
+ 
++#ifdef CONFIG_MEMORY_ISOLATION
++	/*
++	 * Number of isolated pageblock. It is used to solve incorrect
++	 * freepage counting problem due to racy retrieving migratetype
++	 * of pageblock. Protected by zone->lock.
++	 */
++	unsigned long		nr_isolate_pageblock;
++#endif
++
+ #ifdef CONFIG_MEMORY_HOTPLUG
+ 	/* see spanned/present_pages for more description */
+ 	seqlock_t		span_seqlock;
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index 3fff8e774067..2dc1e1697b45 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -2,6 +2,10 @@
+ #define __LINUX_PAGEISOLATION_H
+ 
+ #ifdef CONFIG_MEMORY_ISOLATION
++static inline bool has_isolate_pageblock(struct zone *zone)
++{
++	return zone->nr_isolate_pageblock;
++}
+ static inline bool is_migrate_isolate_page(struct page *page)
+ {
+ 	return get_pageblock_migratetype(page) == MIGRATE_ISOLATE;
+@@ -11,6 +15,10 @@ static inline bool is_migrate_isolate(int migratetype)
+ 	return migratetype == MIGRATE_ISOLATE;
+ }
+ #else
++static inline bool has_isolate_pageblock(struct zone *zone)
++{
++	return false;
++}
+ static inline bool is_migrate_isolate_page(struct page *page)
+ {
+ 	return false;
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index e7debdadd19e..6f6e1b81eb3c 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -751,9 +751,16 @@ static void free_one_page(struct zone *zone,
+ 	if (nr_scanned)
+ 		__mod_zone_page_state(zone, NR_PAGES_SCANNED, -nr_scanned);
+ 
++	if (unlikely(has_isolate_pageblock(zone) ||
++		is_migrate_isolate(migratetype))) {
++		migratetype = get_pfnblock_migratetype(page, pfn);
++		if (is_migrate_isolate(migratetype))
++			goto skip_counting;
++	}
++	__mod_zone_freepage_state(zone, 1 << order, migratetype);
++
++skip_counting:
+ 	__free_one_page(page, pfn, zone, order, migratetype);
+-	if (unlikely(!is_migrate_isolate(migratetype)))
+-		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+ 	spin_unlock(&zone->lock);
+ }
+ 
+diff --git a/mm/page_isolation.c b/mm/page_isolation.c
+index 88bdbf48cf6c..f6b41c4962fc 100644
+--- a/mm/page_isolation.c
++++ b/mm/page_isolation.c
+@@ -60,6 +60,7 @@ out:
+ 		int migratetype = get_pageblock_migratetype(page);
+ 
+ 		set_pageblock_migratetype(page, MIGRATE_ISOLATE);
++		zone->nr_isolate_pageblock++;
+ 		nr_pages = move_freepages_block(zone, page, MIGRATE_ISOLATE);
+ 
+ 		__mod_zone_freepage_state(zone, -nr_pages, migratetype);
+@@ -83,6 +84,7 @@ void unset_migratetype_isolate(struct page *page, unsigned migratetype)
+ 	nr_pages = move_freepages_block(zone, page, migratetype);
+ 	__mod_zone_freepage_state(zone, nr_pages, migratetype);
+ 	set_pageblock_migratetype(page, migratetype);
++	zone->nr_isolate_pageblock--;
+ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+ }
+
+From 82a0da767f62a0a460a7f48d40bfae0ac0123484 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Thu, 13 Nov 2014 15:19:14 -0800
+Subject: [PATCH 2/8] mm/page_alloc: add freepage on isolate pageblock to
+ correct buddy list
+
+In free_pcppages_bulk(), we use cached migratetype of freepage to
+determine type of buddy list where freepage will be added.  This
+information is stored when freepage is added to pcp list, so if
+isolation of pageblock of this freepage begins after storing, this
+cached information could be stale.  In other words, it has original
+migratetype rather than MIGRATE_ISOLATE.
+
+There are two problems caused by this stale information.
+
+One is that we can't keep these freepages from being allocated.
+Although this pageblock is isolated, freepage will be added to normal
+buddy list so that it could be allocated without any restriction.  And
+the other problem is incorrect freepage accounting.  Freepages on
+isolate pageblock should not be counted for number of freepage.
+
+Following is the code snippet in free_pcppages_bulk().
+
+    /* MIGRATE_MOVABLE list may include MIGRATE_RESERVEs */
+    __free_one_page(page, page_to_pfn(page), zone, 0, mt);
+    trace_mm_page_pcpu_drain(page, 0, mt);
+    if (likely(!is_migrate_isolate_page(page))) {
+        __mod_zone_page_state(zone, NR_FREE_PAGES, 1);
+        if (is_migrate_cma(mt))
+            __mod_zone_page_state(zone, NR_FREE_CMA_PAGES, 1);
+    }
+
+As you can see above snippet, current code already handle second
+problem, incorrect freepage accounting, by re-fetching pageblock
+migratetype through is_migrate_isolate_page(page).
+
+But, because this re-fetched information isn't used for
+__free_one_page(), first problem would not be solved.  This patch try to
+solve this situation to re-fetch pageblock migratetype before
+__free_one_page() and to use it for __free_one_page().
+
+In addition to move up position of this re-fetch, this patch use
+optimization technique, re-fetching migratetype only if there is isolate
+pageblock.  Pageblock isolation is rare event, so we can avoid
+re-fetching in common case with this optimization.
+
+This patch also correct migratetype of the tracepoint output.
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Minchan Kim <minchan@kernel.org>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Cc: "Kirill A. Shutemov" <kirill@shutemov.name>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+Cc: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
+Cc: Tang Chen <tangchen@cn.fujitsu.com>
+Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Wen Congyang <wency@cn.fujitsu.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Heesub Shin <heesub.shin@samsung.com>
+Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+Cc: Ritesh Harjani <ritesh.list@gmail.com>
+Cc: Gioh Kim <gioh.kim@lge.com>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/page_alloc.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 6f6e1b81eb3c..eae535a240b7 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -727,14 +727,17 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+ 			/* must delete as __free_one_page list manipulates */
+ 			list_del(&page->lru);
+ 			mt = get_freepage_migratetype(page);
++			if (unlikely(has_isolate_pageblock(zone))) {
++				mt = get_pageblock_migratetype(page);
++				if (is_migrate_isolate(mt))
++					goto skip_counting;
++			}
++			__mod_zone_freepage_state(zone, 1, mt);
++
++skip_counting:
+ 			/* MIGRATE_MOVABLE list may include MIGRATE_RESERVEs */
+ 			__free_one_page(page, page_to_pfn(page), zone, 0, mt);
+ 			trace_mm_page_pcpu_drain(page, 0, mt);
+-			if (likely(!is_migrate_isolate_page(page))) {
+-				__mod_zone_page_state(zone, NR_FREE_PAGES, 1);
+-				if (is_migrate_cma(mt))
+-					__mod_zone_page_state(zone, NR_FREE_CMA_PAGES, 1);
+-			}
+ 		} while (--to_free && --batch_free && !list_empty(list));
+ 	}
+ 	spin_unlock(&zone->lock);
+
+From 7c0b3ff9036d4a9799189136fa376e5a1cf52168 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Thu, 13 Nov 2014 15:19:18 -0800
+Subject: [PATCH 3/8] mm/page_alloc: move freepage counting logic to
+ __free_one_page()
+
+All the caller of __free_one_page() has similar freepage counting logic,
+so we can move it to __free_one_page().  This reduce line of code and
+help future maintenance.
+
+This is also preparation step for "mm/page_alloc: restrict max order of
+merging on isolated pageblock" which fix the freepage counting problem
+on freepage with more than pageblock order.
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Cc: "Kirill A. Shutemov" <kirill@shutemov.name>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Cc: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+Cc: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
+Cc: Tang Chen <tangchen@cn.fujitsu.com>
+Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Wen Congyang <wency@cn.fujitsu.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Heesub Shin <heesub.shin@samsung.com>
+Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+Cc: Ritesh Harjani <ritesh.list@gmail.com>
+Cc: Gioh Kim <gioh.kim@lge.com>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/page_alloc.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index eae535a240b7..4e11860f1e28 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -589,6 +589,8 @@ static inline void __free_one_page(struct page *page,
+ 			return;
+ 
+ 	VM_BUG_ON(migratetype == -1);
++	if (!is_migrate_isolate(migratetype))
++		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+ 
+ 	page_idx = pfn & ((1 << MAX_ORDER) - 1);
+ 
+@@ -727,14 +729,9 @@ static void free_pcppages_bulk(struct zone *zone, int count,
+ 			/* must delete as __free_one_page list manipulates */
+ 			list_del(&page->lru);
+ 			mt = get_freepage_migratetype(page);
+-			if (unlikely(has_isolate_pageblock(zone))) {
++			if (unlikely(has_isolate_pageblock(zone)))
+ 				mt = get_pageblock_migratetype(page);
+-				if (is_migrate_isolate(mt))
+-					goto skip_counting;
+-			}
+-			__mod_zone_freepage_state(zone, 1, mt);
+ 
+-skip_counting:
+ 			/* MIGRATE_MOVABLE list may include MIGRATE_RESERVEs */
+ 			__free_one_page(page, page_to_pfn(page), zone, 0, mt);
+ 			trace_mm_page_pcpu_drain(page, 0, mt);
+@@ -757,12 +754,7 @@ static void free_one_page(struct zone *zone,
+ 	if (unlikely(has_isolate_pageblock(zone) ||
+ 		is_migrate_isolate(migratetype))) {
+ 		migratetype = get_pfnblock_migratetype(page, pfn);
+-		if (is_migrate_isolate(migratetype))
+-			goto skip_counting;
+ 	}
+-	__mod_zone_freepage_state(zone, 1 << order, migratetype);
+-
+-skip_counting:
+ 	__free_one_page(page, pfn, zone, order, migratetype);
+ 	spin_unlock(&zone->lock);
+ }
+
+From f3b632367eff46f60e6d0bf7cff039c97a56dfa2 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Thu, 13 Nov 2014 15:19:21 -0800
+Subject: [PATCH 4/8] mm/page_alloc: restrict max order of merging on isolated
+ pageblock
+
+Current pageblock isolation logic could isolate each pageblock
+individually.  This causes freepage accounting problem if freepage with
+pageblock order on isolate pageblock is merged with other freepage on
+normal pageblock.  We can prevent merging by restricting max order of
+merging to pageblock order if freepage is on isolate pageblock.
+
+A side-effect of this change is that there could be non-merged buddy
+freepage even if finishing pageblock isolation, because undoing
+pageblock isolation is just to move freepage from isolate buddy list to
+normal buddy list rather than to consider merging.  So, the patch also
+makes undoing pageblock isolation consider freepage merge.  When
+un-isolation, freepage with more than pageblock order and it's buddy are
+checked.  If they are on normal pageblock, instead of just moving, we
+isolate the freepage and free it in order to get merged.
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Cc: "Kirill A. Shutemov" <kirill@shutemov.name>
+Cc: Mel Gorman <mgorman@suse.de>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Cc: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+Cc: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
+Cc: Tang Chen <tangchen@cn.fujitsu.com>
+Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Wen Congyang <wency@cn.fujitsu.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Laura Abbott <lauraa@codeaurora.org>
+Cc: Heesub Shin <heesub.shin@samsung.com>
+Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+Cc: Ritesh Harjani <ritesh.list@gmail.com>
+Cc: Gioh Kim <gioh.kim@lge.com>
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/internal.h       | 25 +++++++++++++++++++++++++
+ mm/page_alloc.c     | 41 ++++++++++++++---------------------------
+ mm/page_isolation.c | 41 +++++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 78 insertions(+), 29 deletions(-)
+
+diff --git a/mm/internal.h b/mm/internal.h
+index 1a8a0d4b687a..660c434ae616 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -108,6 +108,31 @@ extern pmd_t *mm_find_pmd(struct mm_struct *mm, unsigned long address);
+ /*
+  * in mm/page_alloc.c
+  */
++
++/*
++ * Locate the struct page for both the matching buddy in our
++ * pair (buddy1) and the combined O(n+1) page they form (page).
++ *
++ * 1) Any buddy B1 will have an order O twin B2 which satisfies
++ * the following equation:
++ *     B2 = B1 ^ (1 << O)
++ * For example, if the starting buddy (buddy2) is #8 its order
++ * 1 buddy is #10:
++ *     B2 = 8 ^ (1 << 1) = 8 ^ 2 = 10
++ *
++ * 2) Any buddy B will have an order O+1 parent P which
++ * satisfies the following equation:
++ *     P = B & ~(1 << O)
++ *
++ * Assumption: *_mem_map is contiguous at least up to MAX_ORDER
++ */
++static inline unsigned long
++__find_buddy_index(unsigned long page_idx, unsigned int order)
++{
++	return page_idx ^ (1 << order);
++}
++
++extern int __isolate_free_page(struct page *page, unsigned int order);
+ extern void __free_pages_bootmem(struct page *page, unsigned int order);
+ extern void prep_compound_page(struct page *page, unsigned long order);
+ #ifdef CONFIG_MEMORY_FAILURE
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 4e11860f1e28..01897d4d44c9 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -479,29 +479,6 @@ static inline void rmv_page_order(struct page *page)
+ }
+ 
+ /*
+- * Locate the struct page for both the matching buddy in our
+- * pair (buddy1) and the combined O(n+1) page they form (page).
+- *
+- * 1) Any buddy B1 will have an order O twin B2 which satisfies
+- * the following equation:
+- *     B2 = B1 ^ (1 << O)
+- * For example, if the starting buddy (buddy2) is #8 its order
+- * 1 buddy is #10:
+- *     B2 = 8 ^ (1 << 1) = 8 ^ 2 = 10
+- *
+- * 2) Any buddy B will have an order O+1 parent P which
+- * satisfies the following equation:
+- *     P = B & ~(1 << O)
+- *
+- * Assumption: *_mem_map is contiguous at least up to MAX_ORDER
+- */
+-static inline unsigned long
+-__find_buddy_index(unsigned long page_idx, unsigned int order)
+-{
+-	return page_idx ^ (1 << order);
+-}
+-
+-/*
+  * This function checks whether a page is free && is the buddy
+  * we can do coalesce a page and its buddy if
+  * (a) the buddy is not in a hole &&
+@@ -581,6 +558,7 @@ static inline void __free_one_page(struct page *page,
+ 	unsigned long combined_idx;
+ 	unsigned long uninitialized_var(buddy_idx);
+ 	struct page *buddy;
++	int max_order = MAX_ORDER;
+ 
+ 	VM_BUG_ON(!zone_is_initialized(zone));
+ 
+@@ -589,15 +567,24 @@ static inline void __free_one_page(struct page *page,
+ 			return;
+ 
+ 	VM_BUG_ON(migratetype == -1);
+-	if (!is_migrate_isolate(migratetype))
++	if (is_migrate_isolate(migratetype)) {
++		/*
++		 * We restrict max order of merging to prevent merge
++		 * between freepages on isolate pageblock and normal
++		 * pageblock. Without this, pageblock isolation
++		 * could cause incorrect freepage accounting.
++		 */
++		max_order = min(MAX_ORDER, pageblock_order + 1);
++	} else {
+ 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
++	}
+ 
+-	page_idx = pfn & ((1 << MAX_ORDER) - 1);
++	page_idx = pfn & ((1 << max_order) - 1);
+ 
+ 	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
+ 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+ 
+-	while (order < MAX_ORDER-1) {
++	while (order < max_order - 1) {
+ 		buddy_idx = __find_buddy_index(page_idx, order);
+ 		buddy = page + (buddy_idx - page_idx);
+ 		if (!page_is_buddy(page, buddy, order))
+@@ -1506,7 +1493,7 @@ void split_page(struct page *page, unsigned int order)
+ }
+ EXPORT_SYMBOL_GPL(split_page);
+ 
+-static int __isolate_free_page(struct page *page, unsigned int order)
++int __isolate_free_page(struct page *page, unsigned int order)
+ {
+ 	unsigned long watermark;
+ 	struct zone *zone;
+diff --git a/mm/page_isolation.c b/mm/page_isolation.c
+index f6b41c4962fc..bec871c082cd 100644
+--- a/mm/page_isolation.c
++++ b/mm/page_isolation.c
+@@ -76,17 +76,54 @@ void unset_migratetype_isolate(struct page *page, unsigned migratetype)
+ {
+ 	struct zone *zone;
+ 	unsigned long flags, nr_pages;
++	struct page *isolated_page = NULL;
++	unsigned int order;
++	unsigned long page_idx, buddy_idx;
++	struct page *buddy;
+ 
+ 	zone = page_zone(page);
+ 	spin_lock_irqsave(&zone->lock, flags);
+ 	if (get_pageblock_migratetype(page) != MIGRATE_ISOLATE)
+ 		goto out;
+-	nr_pages = move_freepages_block(zone, page, migratetype);
+-	__mod_zone_freepage_state(zone, nr_pages, migratetype);
++
++	/*
++	 * Because freepage with more than pageblock_order on isolated
++	 * pageblock is restricted to merge due to freepage counting problem,
++	 * it is possible that there is free buddy page.
++	 * move_freepages_block() doesn't care of merge so we need other
++	 * approach in order to merge them. Isolation and free will make
++	 * these pages to be merged.
++	 */
++	if (PageBuddy(page)) {
++		order = page_order(page);
++		if (order >= pageblock_order) {
++			page_idx = page_to_pfn(page) & ((1 << MAX_ORDER) - 1);
++			buddy_idx = __find_buddy_index(page_idx, order);
++			buddy = page + (buddy_idx - page_idx);
++
++			if (!is_migrate_isolate_page(buddy)) {
++				__isolate_free_page(page, order);
++				set_page_refcounted(page);
++				isolated_page = page;
++			}
++		}
++	}
++
++	/*
++	 * If we isolate freepage with more than pageblock_order, there
++	 * should be no freepage in the range, so we could avoid costly
++	 * pageblock scanning for freepage moving.
++	 */
++	if (!isolated_page) {
++		nr_pages = move_freepages_block(zone, page, migratetype);
++		__mod_zone_freepage_state(zone, nr_pages, migratetype);
++	}
+ 	set_pageblock_migratetype(page, migratetype);
+ 	zone->nr_isolate_pageblock--;
+ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
++	if (isolated_page)
++		__free_pages(isolated_page, order);
+ }
+ 
+ static inline struct page *
+
+From cd8e51758ffe36aeb5d53790d1a541ff2440cef1 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Thu, 13 Nov 2014 15:19:36 -0800
+Subject: [PATCH 5/8] mm/debug-pagealloc: correct freepage accounting and order
+ resetting
+
+One thing I did in this patch is fixing freepage accounting.  If we
+clear guard page and link it onto isolate buddy list, we should not
+increase freepage count.  This patch adds conditional branch to skip
+counting in this case.  Without this patch, this overcounting happens
+frequently if guard order is set and CMA is used.
+
+Another thing fixed in this patch is the target to reset order.  In
+__free_one_page(), we check the buddy page whether it is a guard page or
+not.  And, if so, we should clear guard attribute on the buddy page and
+reset order of it to 0.  But, current code resets original page's order
+rather than buddy one's.  Maybe, this doesn't have any problem, because
+whole merged page's order will be re-assigned soon.  But, it is better
+to correct code.
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Cc: Gioh Kim <gioh.kim@lge.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/page_alloc.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 01897d4d44c9..b04e573f58f2 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -595,9 +595,11 @@ static inline void __free_one_page(struct page *page,
+ 		 */
+ 		if (page_is_guard(buddy)) {
+ 			clear_page_guard_flag(buddy);
+-			set_page_private(page, 0);
+-			__mod_zone_freepage_state(zone, 1 << order,
+-						  migratetype);
++			set_page_private(buddy, 0);
++			if (!is_migrate_isolate(migratetype)) {
++				__mod_zone_freepage_state(zone, 1 << order,
++							  migratetype);
++			}
+ 		} else {
+ 			list_del(&buddy->lru);
+ 			zone->free_area[order].nr_free--;
+
+From 76c2d4b48d079a7d352dc488790bc3dcf1334ea8 Mon Sep 17 00:00:00 2001
+From: Vlastimil Babka <vbabka@suse.cz>
+Date: Fri, 25 Mar 2016 14:21:50 -0700
+Subject: [PATCH 6/8] mm/page_alloc: prevent merging between isolated and other
+ pageblocks
+
+Hanjun Guo has reported that a CMA stress test causes broken accounting of
+CMA and free pages:
+
+> Before the test, I got:
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal:         204800 kB
+> CmaFree:          195044 kB
+>
+>
+> After running the test:
+> -bash-4.3# cat /proc/meminfo | grep Cma
+> CmaTotal:         204800 kB
+> CmaFree:         6602584 kB
+>
+> So the freed CMA memory is more than total..
+>
+> Also the the MemFree is more than mem total:
+>
+> -bash-4.3# cat /proc/meminfo
+> MemTotal:       16342016 kB
+> MemFree:        22367268 kB
+> MemAvailable:   22370528 kB
+
+Laura Abbott has confirmed the issue and suspected the freepage accounting
+rewrite around 3.18/4.0 by Joonsoo Kim.  Joonsoo had a theory that this is
+caused by unexpected merging between MIGRATE_ISOLATE and MIGRATE_CMA
+pageblocks:
+
+> CMA isolates MAX_ORDER aligned blocks, but, during the process,
+> partialy isolated block exists. If MAX_ORDER is 11 and
+> pageblock_order is 9, two pageblocks make up MAX_ORDER
+> aligned block and I can think following scenario because pageblock
+> (un)isolation would be done one by one.
+>
+> (each character means one pageblock. 'C', 'I' means MIGRATE_CMA,
+> MIGRATE_ISOLATE, respectively.
+>
+> CC -> IC -> II (Isolation)
+> II -> CI -> CC (Un-isolation)
+>
+> If some pages are freed at this intermediate state such as IC or CI,
+> that page could be merged to the other page that is resident on
+> different type of pageblock and it will cause wrong freepage count.
+
+This was supposed to be prevented by CMA operating on MAX_ORDER blocks,
+but since it doesn't hold the zone->lock between pageblocks, a race
+window does exist.
+
+It's also likely that unexpected merging can occur between
+MIGRATE_ISOLATE and non-CMA pageblocks.  This should be prevented in
+__free_one_page() since commit 3c605096d315 ("mm/page_alloc: restrict
+max order of merging on isolated pageblock").  However, we only check
+the migratetype of the pageblock where buddy merging has been initiated,
+not the migratetype of the buddy pageblock (or group of pageblocks)
+which can be MIGRATE_ISOLATE.
+
+Joonsoo has suggested checking for buddy migratetype as part of
+page_is_buddy(), but that would add extra checks in allocator hotpath
+and bloat-o-meter has shown significant code bloat (the function is
+inline).
+
+This patch reduces the bloat at some expense of more complicated code.
+The buddy-merging while-loop in __free_one_page() is initially bounded
+to pageblock_border and without any migratetype checks.  The checks are
+placed outside, bumping the max_order if merging is allowed, and
+returning to the while-loop with a statement which can't be possibly
+considered harmful.
+
+This fixes the accounting bug and also removes the arguably weird state
+in the original commit 3c605096d315 where buddies could be left
+unmerged.
+
+Fixes: 3c605096d315 ("mm/page_alloc: restrict max order of merging on isolated pageblock")
+Link: https://lkml.org/lkml/2016/3/2/280
+Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
+Reported-by: Hanjun Guo <guohanjun@huawei.com>
+Tested-by: Hanjun Guo <guohanjun@huawei.com>
+Acked-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Debugged-by: Laura Abbott <labbott@redhat.com>
+Debugged-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Cc: Mel Gorman <mgorman@techsingularity.net>
+Cc: "Kirill A. Shutemov" <kirill@shutemov.name>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Cc: Yasuaki Ishimatsu <isimatu.yasuaki@jp.fujitsu.com>
+Cc: Zhang Yanfei <zhangyanfei@cn.fujitsu.com>
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+Cc: <stable@vger.kernel.org>	[3.18+]
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/page_alloc.c | 46 +++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 33 insertions(+), 13 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index b04e573f58f2..7ba0f6606f46 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -558,7 +558,9 @@ static inline void __free_one_page(struct page *page,
+ 	unsigned long combined_idx;
+ 	unsigned long uninitialized_var(buddy_idx);
+ 	struct page *buddy;
+-	int max_order = MAX_ORDER;
++	int max_order;
++
++	max_order = min(MAX_ORDER, pageblock_order + 1);
+ 
+ 	VM_BUG_ON(!zone_is_initialized(zone));
+ 
+@@ -567,28 +569,20 @@ static inline void __free_one_page(struct page *page,
+ 			return;
+ 
+ 	VM_BUG_ON(migratetype == -1);
+-	if (is_migrate_isolate(migratetype)) {
+-		/*
+-		 * We restrict max order of merging to prevent merge
+-		 * between freepages on isolate pageblock and normal
+-		 * pageblock. Without this, pageblock isolation
+-		 * could cause incorrect freepage accounting.
+-		 */
+-		max_order = min(MAX_ORDER, pageblock_order + 1);
+-	} else {
++	if (likely(!is_migrate_isolate(migratetype)))
+ 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+-	}
+ 
+-	page_idx = pfn & ((1 << max_order) - 1);
++	page_idx = pfn & ((1 << MAX_ORDER) - 1);
+ 
+ 	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
+ 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+ 
++continue_merging:
+ 	while (order < max_order - 1) {
+ 		buddy_idx = __find_buddy_index(page_idx, order);
+ 		buddy = page + (buddy_idx - page_idx);
+ 		if (!page_is_buddy(page, buddy, order))
+-			break;
++			goto done_merging;
+ 		/*
+ 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
+ 		 * merge with it and move up one order.
+@@ -610,6 +604,32 @@ static inline void __free_one_page(struct page *page,
+ 		page_idx = combined_idx;
+ 		order++;
+ 	}
++	if (max_order < MAX_ORDER) {
++		/* If we are here, it means order is >= pageblock_order.
++		 * We want to prevent merge between freepages on isolate
++		 * pageblock and normal pageblock. Without this, pageblock
++		 * isolation could cause incorrect freepage or CMA accounting.
++		 *
++		 * We don't want to hit this code for the more frequent
++		 * low-order merging.
++		 */
++		if (unlikely(has_isolate_pageblock(zone))) {
++			int buddy_mt;
++
++			buddy_idx = __find_buddy_index(page_idx, order);
++			buddy = page + (buddy_idx - page_idx);
++			buddy_mt = get_pageblock_migratetype(buddy);
++
++			if (migratetype != buddy_mt
++					&& (is_migrate_isolate(migratetype) ||
++						is_migrate_isolate(buddy_mt)))
++				goto done_merging;
++		}
++		max_order++;
++		goto continue_merging;
++	}
++
++done_merging:
+ 	set_page_order(page, order);
+ 
+ 	/*
+
+From b0543416e4ae4f8402db1fa73e09523cdb2ae074 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Thu, 9 Oct 2014 15:28:28 -0700
+Subject: [PATCH 7/8] mm: page_alloc: Make paranoid check in move_freepages a
+ VM_BUG_ON
+
+Since 2.6.24 there has been a paranoid check in move_freepages that looks
+up the zone of two pages.  This is a very slow path and the only time I've
+seen this bug trigger recently is when memory initialisation was broken
+during patch development.  Despite the fact it's a slow path, this patch
+converts the check to a VM_BUG_ON anyway as it has served its purpose by
+now.
+
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Acked-by: David Rientjes <rientjes@google.com>
+Acked-by: Rik van Riel <riel@redhat.com>
+Acked-by: Johannes Weiner <hannes@cmpxchg.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/page_alloc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 7ba0f6606f46..70fd712ab996 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1036,7 +1036,7 @@ int move_freepages(struct zone *zone,
+ 	 * Remove at a later date when no bug reports exist related to
+ 	 * grouping pages by mobility
+ 	 */
+-	BUG_ON(page_zone(start_page) != page_zone(end_page));
++	VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
+ #endif
+ 
+ 	for (page = start_page; page <= end_page;) {
+
+From 0e887498e758427cc3d9f50b7e08ffb899c1d8a3 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Thu, 9 Oct 2014 15:28:30 -0700
+Subject: [PATCH 8/8] mm: page_alloc: default node-ordering on 64-bit NUMA,
+ zone-ordering on 32-bit
+
+Zones are allocated by the page allocator in either node or zone order.
+Node ordering is preferred in terms of locality and is applied
+automatically in one of three cases:
+
+  1. If a node has only low memory
+
+  2. If DMA/DMA32 is a high percentage of memory
+
+  3. If low memory on a single node is greater than 70% of the node size
+
+Otherwise zone ordering is used to preserve low memory for devices that
+require it.  Unfortunately a consequence of this is that applications
+running on a machine with balanced NUMA nodes will experience different
+performance characteristics depending on which node they happen to start
+from.
+
+The point of zone ordering is to protect lower zones for devices that
+require DMA/DMA32 memory.  When NUMA was first introduced, this was
+critical as 32-bit NUMA machines existed and exhausting low memory
+triggered OOMs easily as so many allocations required low memory.  On
+64-bit machines the primary concern is devices that are 32-bit only which
+is less severe than the low memory exhaustion problem on 32-bit NUMA.  It
+seems there are really few devices that depends on it.
+
+AGP -- I assume this is getting more rare but even then I think the allocations
+	happen early in boot time where lowmem pressure is less of a problem
+
+DRM -- If the device is 32-bit only then there may be low pressure. I didn't
+	evaluate these in detail but it looks like some of these are mobile
+	graphics card. Not many NUMA laptops out there. DRM folk should know
+	better though.
+
+Some TV cards -- Much demand for 32-bit capable TV cards on NUMA machines?
+
+B43 wireless card -- again not really a NUMA thing.
+
+I cannot find a good reason to incur a performance penalty on all 64-bit NUMA
+machines in case someone throws a brain damanged TV or graphics card in there.
+This patch defaults to node-ordering on 64-bit NUMA machines. I was tempted
+to make it default everywhere but I understand that some embedded arches may
+be using 32-bit NUMA where I cannot predict the consequences.
+
+The performance impact depends on the workload and the characteristics of the
+machine and the machine I tested on had a large Normal zone on node 0 so the
+impact is within the noise for the majority of tests. The allocation stats
+show more allocation requests were from DMA32 and local node. Running SpecJBB
+with multiple JVMs and automatic NUMA balancing disabled the results were
+
+specjbb
+                     3.17.0-rc2            3.17.0-rc2
+                        vanilla        nodeorder-v1r1
+Min    1      29534.00 (  0.00%)     30020.00 (  1.65%)
+Min    10    115717.00 (  0.00%)    134038.00 ( 15.83%)
+Min    19    109718.00 (  0.00%)    114186.00 (  4.07%)
+Min    28    104459.00 (  0.00%)    103639.00 ( -0.78%)
+Min    37     98245.00 (  0.00%)    103756.00 (  5.61%)
+Min    46     97198.00 (  0.00%)     96197.00 ( -1.03%)
+Mean   1      30953.25 (  0.00%)     31917.75 (  3.12%)
+Mean   10    124432.50 (  0.00%)    140904.00 ( 13.24%)
+Mean   19    116033.50 (  0.00%)    119294.75 (  2.81%)
+Mean   28    108365.25 (  0.00%)    106879.50 ( -1.37%)
+Mean   37    102984.75 (  0.00%)    106924.25 (  3.83%)
+Mean   46    100783.25 (  0.00%)    105368.50 (  4.55%)
+Stddev 1       1260.38 (  0.00%)      1109.66 ( 11.96%)
+Stddev 10      7434.03 (  0.00%)      5171.91 ( 30.43%)
+Stddev 19      8453.84 (  0.00%)      5309.59 ( 37.19%)
+Stddev 28      4184.55 (  0.00%)      2906.63 ( 30.54%)
+Stddev 37      5409.49 (  0.00%)      3192.12 ( 40.99%)
+Stddev 46      4521.95 (  0.00%)      7392.52 (-63.48%)
+Max    1      32738.00 (  0.00%)     32719.00 ( -0.06%)
+Max    10    136039.00 (  0.00%)    148614.00 (  9.24%)
+Max    19    130566.00 (  0.00%)    127418.00 ( -2.41%)
+Max    28    115404.00 (  0.00%)    111254.00 ( -3.60%)
+Max    37    112118.00 (  0.00%)    111732.00 ( -0.34%)
+Max    46    108541.00 (  0.00%)    116849.00 (  7.65%)
+TPut   1     123813.00 (  0.00%)    127671.00 (  3.12%)
+TPut   10    497730.00 (  0.00%)    563616.00 ( 13.24%)
+TPut   19    464134.00 (  0.00%)    477179.00 (  2.81%)
+TPut   28    433461.00 (  0.00%)    427518.00 ( -1.37%)
+TPut   37    411939.00 (  0.00%)    427697.00 (  3.83%)
+TPut   46    403133.00 (  0.00%)    421474.00 (  4.55%)
+
+                            3.17.0-rc2  3.17.0-rc2
+                               vanillanodeorder-v1r1
+DMA allocs                           0           0
+DMA32 allocs                        57     1491992
+Normal allocs                 32543566    30026383
+Movable allocs                       0           0
+Direct pages scanned                 0           0
+Kswapd pages scanned                 0           0
+Kswapd pages reclaimed               0           0
+Direct pages reclaimed               0           0
+Kswapd efficiency                 100%        100%
+Kswapd velocity                  0.000       0.000
+Direct efficiency                 100%        100%
+Direct velocity                  0.000       0.000
+Percentage direct scans             0%          0%
+Zone normal velocity             0.000       0.000
+Zone dma32 velocity              0.000       0.000
+Zone dma velocity                0.000       0.000
+THP fault alloc                  55164       52987
+THP collapse alloc                 139         147
+THP splits                          26          21
+NUMA alloc hit                 4169066     4250692
+NUMA alloc miss                      0           0
+
+Note that there were more DMA32 allocations with the patch applied.  In this
+particular case there was no difference in numa_hit and numa_miss. The
+expectation is that DMA32 was being used at the low watermark instead of
+falling into the slow path. kswapd was not woken but it's not worken for
+THP allocations.
+
+On 32-bit, this patch defaults to zone-ordering as low memory depletion
+can be a serious problem on 32-bit large memory machines. If the default
+ordering was node then processes on node 0 will deplete the Normal zone
+due to normal activity.  The problem is worse if CONFIG_HIGHPTE is not
+set. If combined with large amounts of dirty/writeback pages in Normal
+zone then there is also a high risk of OOM. The heuristics are removed
+as it's not clear they were ever important on 32-bit. They were only
+relevant for setting node-ordering on 64-bit.
+
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Acked-by: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Rik van Riel <riel@redhat.com>
+Cc: David Rientjes <rientjes@google.com>
+Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Cc: Fengguang Wu <fengguang.wu@intel.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/page_alloc.c | 78 +++++++++++++++------------------------------------------
+ 1 file changed, 20 insertions(+), 58 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 70fd712ab996..258cdc155e41 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -3609,68 +3609,30 @@ static void build_zonelists_in_zone_order(pg_data_t *pgdat, int nr_nodes)
+ 	zonelist->_zonerefs[pos].zone_idx = 0;
+ }
+ 
++#if defined(CONFIG_64BIT)
++/*
++ * Devices that require DMA32/DMA are relatively rare and do not justify a
++ * penalty to every machine in case the specialised case applies. Default
++ * to Node-ordering on 64-bit NUMA machines
++ */
++static int default_zonelist_order(void)
++{
++	return ZONELIST_ORDER_NODE;
++}
++#else
++/*
++ * On 32-bit, the Normal zone needs to be preserved for allocations accessible
++ * by the kernel. If processes running on node 0 deplete the low memory zone
++ * then reclaim will occur more frequency increasing stalls and potentially
++ * be easier to OOM if a large percentage of the zone is under writeback or
++ * dirty. The problem is significantly worse if CONFIG_HIGHPTE is not set.
++ * Hence, default to zone ordering on 32-bit.
++ */
+ static int default_zonelist_order(void)
+ {
+-	int nid, zone_type;
+-	unsigned long low_kmem_size, total_size;
+-	struct zone *z;
+-	int average_size;
+-	/*
+-	 * ZONE_DMA and ZONE_DMA32 can be very small area in the system.
+-	 * If they are really small and used heavily, the system can fall
+-	 * into OOM very easily.
+-	 * This function detect ZONE_DMA/DMA32 size and configures zone order.
+-	 */
+-	/* Is there ZONE_NORMAL ? (ex. ppc has only DMA zone..) */
+-	low_kmem_size = 0;
+-	total_size = 0;
+-	for_each_online_node(nid) {
+-		for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++) {
+-			z = &NODE_DATA(nid)->node_zones[zone_type];
+-			if (populated_zone(z)) {
+-				if (zone_type < ZONE_NORMAL)
+-					low_kmem_size += z->managed_pages;
+-				total_size += z->managed_pages;
+-			} else if (zone_type == ZONE_NORMAL) {
+-				/*
+-				 * If any node has only lowmem, then node order
+-				 * is preferred to allow kernel allocations
+-				 * locally; otherwise, they can easily infringe
+-				 * on other nodes when there is an abundance of
+-				 * lowmem available to allocate from.
+-				 */
+-				return ZONELIST_ORDER_NODE;
+-			}
+-		}
+-	}
+-	if (!low_kmem_size ||  /* there are no DMA area. */
+-	    low_kmem_size > total_size/2) /* DMA/DMA32 is big. */
+-		return ZONELIST_ORDER_NODE;
+-	/*
+-	 * look into each node's config.
+-	 * If there is a node whose DMA/DMA32 memory is very big area on
+-	 * local memory, NODE_ORDER may be suitable.
+-	 */
+-	average_size = total_size /
+-				(nodes_weight(node_states[N_MEMORY]) + 1);
+-	for_each_online_node(nid) {
+-		low_kmem_size = 0;
+-		total_size = 0;
+-		for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++) {
+-			z = &NODE_DATA(nid)->node_zones[zone_type];
+-			if (populated_zone(z)) {
+-				if (zone_type < ZONE_NORMAL)
+-					low_kmem_size += z->present_pages;
+-				total_size += z->present_pages;
+-			}
+-		}
+-		if (low_kmem_size &&
+-		    total_size > average_size && /* ignore small node */
+-		    low_kmem_size > total_size * 70/100)
+-			return ZONELIST_ORDER_NODE;
+-	}
+ 	return ZONELIST_ORDER_ZONE;
+ }
++#endif /* CONFIG_64BIT */
+ 
+ static void set_zonelist_order(void)
+ {

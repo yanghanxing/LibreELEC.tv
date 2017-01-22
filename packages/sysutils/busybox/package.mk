@@ -228,6 +228,15 @@ post_install() {
       cp $PKG_DIR/system.d.opt/cron-defaults.service $INSTALL/usr/lib/systemd/system
       enable_service cron-defaults.service
   fi
+
+  if [ "$SWAP_SUPPORT" != "yes" ]; then
+    mkdir -p $INSTALL/usr/lib/sysctl.d
+	  cat > $INSTALL/usr/lib/sysctl.d/memory.conf <<EOF
+vm.admin_reserve_kbytes=0
+vm.user_reserve_kbytes=0
+vm.min_free_kbytes=0
+EOF
+  fi
 }
 
 makeinstall_init() {

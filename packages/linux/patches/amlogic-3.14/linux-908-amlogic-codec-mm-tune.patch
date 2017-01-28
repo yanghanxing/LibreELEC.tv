@@ -1,0 +1,285 @@
+diff --git a/arch/arm64/boot/dts/amlogic/gxbb_p200_1G_wetek_hub.dts b/arch/arm64/boot/dts/amlogic/gxbb_p200_1G_wetek_hub.dts
+index 08a9f341a121..f90b871481fa 100644
+--- a/arch/arm64/boot/dts/amlogic/gxbb_p200_1G_wetek_hub.dts
++++ b/arch/arm64/boot/dts/amlogic/gxbb_p200_1G_wetek_hub.dts
+@@ -38,7 +38,16 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
++
+ 		/* global autoconfigured region for contiguous allocations */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			size = <0x0 0x2000000>;
++			alignment = <0x0 0x400000>;
++			linux,cma-default;
++		};
++
+ 		secmon_reserved:linux,secmon {
+ 			compatible = "amlogic, aml_secmon_memory";
+ 			reg = <0x0 0x10000000 0x0 0x200000>;
+@@ -52,8 +61,8 @@
+ 		};
+ 		pstore:aml_pstore {
+ 			compatible = "amlogic, pstore";
+-			reg = <0x0 0x07300000 0x0 0x100000>;
+-			no-map;
++			//reg = <0x0 0x07300000 0x0 0x100000>;
++			//no-map;
+ 		};
+ 		fb_reserved:linux,meson-fb {
+ 			compatible = "amlogic, fb-memory";
+@@ -64,14 +73,11 @@
+ 		di_reserved:linux,di {
+ 			compatible = "amlogic, di-mem";
+ 			size = <0x0 0x1e00000>; //10x1920x1088x3/2=30M
+-			//no-map;
+-			multi-use;
+ 		};
+ 
+ 		ion_reserved:linux,ion-dev {
+ 			compatible = "amlogic, idev-mem";
+-			size = <0x0 0x2000000>;
+-			multi-use;
++			//size = <0x0 0x2000000>;
+ 		};
+ 
+ 		/*  vdin0 */
+@@ -87,17 +93,16 @@
+ //			size = <0x0 0x01000000>;
+ //		};
+ 		/*  POST PROCESS MANAGER */
+-		//ppmgr_reserved:linux,ppmgr {
+-		//	compatible = "amlogic, ppmgr_memory";
+-		//	size = <0x0 0x2000000>;
+-		//};
++		ppmgr_reserved:linux,ppmgr {
++			compatible = "amlogic, ppmgr_memory";
++			//size = <0x0 0x2000000>;
++		};
+ 
+ 		codec_mm_cma:linux,codec_mm_cma {
+ 			compatible = "shared-dma-pool";
+ 			reusable;
+-			size = <0x0 0xc000000>;
+-			alignment = <0x0 0x400000>;
+-			linux,contiguous-region;
++			size = <0x0 0xa000000>;
++			alignment = <0x0 0x800000>;
+ 		};
+ 		picdec_cma_reserved:linux,picdec {
+ 			compatible = "shared-dma-pool";
+@@ -105,7 +110,6 @@
+ 			size = <0x0 0x0>;
+ 			status = "disabled";
+ 			alignment = <0x0 0x400000>;
+-			linux,contiguous-region;
+ 		};
+ 		/*vm0_cma_reserved:linux,vm0_cma {
+ 			compatible = "shared-dma-pool";
+@@ -122,9 +126,8 @@
+ 		/* codec shared reserved */
+ 		codec_mm_reserved:linux,codec_mm_reserved {
+ 			compatible = "amlogic, codec-mm-reserved";
+-			size = <0x0 0x4100000>;
+-			alignment = <0x0 0x100000>;
+- 			//no-map;
++			size = <0x0 0x6000000>;
++			alignment = <0x0 0x800000>;
+ 		};
+ 	};
+ 
+@@ -274,7 +277,7 @@
+ 	};
+ 	ppmgr {
+ 		compatible = "amlogic, ppmgr";//to match of_device_id's compatible member
+-		memory-region = <&ion_reserved>;
++		memory-region = <&ppmgr_reserved>;
+ 		dev_name = "ppmgr";
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm64/boot/dts/amlogic/gxbb_p200_2G_wetek_play_2.dts b/arch/arm64/boot/dts/amlogic/gxbb_p200_2G_wetek_play_2.dts
+index a5c8f824d26a..e1946d1fc7bb 100644
+--- a/arch/arm64/boot/dts/amlogic/gxbb_p200_2G_wetek_play_2.dts
++++ b/arch/arm64/boot/dts/amlogic/gxbb_p200_2G_wetek_play_2.dts
+@@ -38,7 +38,16 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
++
+ 		/* global autoconfigured region for contiguous allocations */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			size = <0x0 0x2000000>;
++			alignment = <0x0 0x400000>;
++			linux,cma-default;
++		};
++
+ 		secmon_reserved:linux,secmon {
+ 			compatible = "amlogic, aml_secmon_memory";
+ 			reg = <0x0 0x10000000 0x0 0x200000>;
+@@ -52,8 +61,8 @@
+ 		};
+ 		pstore:aml_pstore {
+ 			compatible = "amlogic, pstore";
+-			reg = <0x0 0x07300000 0x0 0x100000>;
+-			no-map;
++			//reg = <0x0 0x07300000 0x0 0x100000>;
++			//no-map;
+ 		};
+ 		fb_reserved:linux,meson-fb {
+ 			compatible = "amlogic, fb-memory";
+@@ -64,14 +73,11 @@
+ 		di_reserved:linux,di {
+ 			compatible = "amlogic, di-mem";
+ 			size = <0x0 0x1e00000>; //10x1920x1088x3/2=30M
+-			//no-map;
+-			multi-use;
+ 		};
+ 
+ 		ion_reserved:linux,ion-dev {
+ 			compatible = "amlogic, idev-mem";
+-			size = <0x0 0x2000000>;
+-			multi-use;
++			//size = <0x0 0x2000000>;
+ 		};
+ 
+ 		/*  vdin0 */
+@@ -87,17 +93,16 @@
+ //			size = <0x0 0x01000000>;
+ //		};
+ 		/*  POST PROCESS MANAGER */
+-		//ppmgr_reserved:linux,ppmgr {
+-		//	compatible = "amlogic, ppmgr_memory";
+-		//	size = <0x0 0x2000000>;
+-		//};
++		ppmgr_reserved:linux,ppmgr {
++			compatible = "amlogic, ppmgr_memory";
++			//size = <0x0 0x2000000>;
++		};
+ 
+ 		codec_mm_cma:linux,codec_mm_cma {
+ 			compatible = "shared-dma-pool";
+ 			reusable;
+-			size = <0x0 0xc000000>;
+-			alignment = <0x0 0x400000>;
+-			linux,contiguous-region;
++			size = <0x0 0xa000000>;
++			alignment = <0x0 0x800000>;
+ 		};
+ 		picdec_cma_reserved:linux,picdec {
+ 			compatible = "shared-dma-pool";
+@@ -105,7 +110,6 @@
+ 			size = <0x0 0x0>;
+ 			status = "disabled";
+ 			alignment = <0x0 0x400000>;
+-			linux,contiguous-region;
+ 		};
+ 		/*vm0_cma_reserved:linux,vm0_cma {
+ 			compatible = "shared-dma-pool";
+@@ -122,9 +126,8 @@
+ 		/* codec shared reserved */
+ 		codec_mm_reserved:linux,codec_mm_reserved {
+ 			compatible = "amlogic, codec-mm-reserved";
+-			size = <0x0 0x4100000>;
+-			alignment = <0x0 0x100000>;
+- 			//no-map;
++			size = <0x0 0x6000000>;
++			alignment = <0x0 0x800000>;
+ 		};
+ 	};
+ 
+@@ -257,7 +260,7 @@
+ 	};
+ 	ppmgr {
+ 		compatible = "amlogic, ppmgr";//to match of_device_id's compatible member
+-		memory-region = <&ion_reserved>;
++		memory-region = <&ppmgr_reserved>;
+ 		dev_name = "ppmgr";
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm64/boot/dts/meson64_odroidc2.dts b/arch/arm64/boot/dts/meson64_odroidc2.dts
+index 77ee90de37b8..09c9c4bac31b 100644
+--- a/arch/arm64/boot/dts/meson64_odroidc2.dts
++++ b/arch/arm64/boot/dts/meson64_odroidc2.dts
+@@ -47,7 +47,16 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
++
+ 		/* global autoconfigured region for contiguous allocations */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			size = <0x0 0x2000000>;
++			alignment = <0x0 0x400000>;
++			linux,cma-default;
++		};
++
+ 		secmon_reserved:linux,secmon {
+ 			compatible = "amlogic, aml_secmon_memory";
+ 			reg = <0x0 0x10000000 0x0 0x200000>;
+@@ -61,8 +70,8 @@
+ 		};
+ 		pstore:aml_pstore {
+ 			compatible = "amlogic, pstore";
+-			reg = <0x0 0x07300000 0x0 0x100000>;
+-			no-map;
++			//reg = <0x0 0x07300000 0x0 0x100000>;
++			//no-map;
+ 		};
+ 		fb_reserved:linux,meson-fb {
+ 			compatible = "amlogic, fb-memory";
+@@ -73,29 +82,24 @@
+ 		di_reserved:linux,di {
+ 			compatible = "amlogic, di-mem";
+ 			size = <0x0 0x1e00000>; //10x1920x1088x3/2=30M
+-			//no-map;
+-			multi-use;
+ 		};
+ 
+ 		ion_reserved:linux,ion-dev {
+ 			compatible = "amlogic, idev-mem";
+-			size = <0x0 0x2000000>;
+-			multi-use;
++			//size = <0x0 0x2000000>;
+ 		};
+ 
+ 		/*  POST PROCESS MANAGER */
+ 		ppmgr_reserved:linux,ppmgr {
+ 			compatible = "amlogic, ppmgr_memory";
+-			size = <0x0 0x0>;
+-			multi-use;
++			//size = <0x0 0x2000000>;
+ 		};
+ 
+ 		codec_mm_cma:linux,codec_mm_cma {
+ 			compatible = "shared-dma-pool";
+ 			reusable;
+-			size = <0x0 0xc000000>;
+-			alignment = <0x0 0x400000>;
+-			linux,contiguous-region;
++			size = <0x0 0xa000000>;
++			alignment = <0x0 0x800000>;
+ 		};
+ 		picdec_cma_reserved:linux,picdec {
+ 			compatible = "shared-dma-pool";
+@@ -103,14 +107,12 @@
+ 			size = <0x0 0x0>;
+ 			status = "disabled";
+ 			alignment = <0x0 0x400000>;
+-			linux,contiguous-region;
+ 		};
+ 		/* codec shared reserved */
+ 		codec_mm_reserved:linux,codec_mm_reserved {
+ 			compatible = "amlogic, codec-mm-reserved";
+-			size = <0x0 0x4100000>;
+-			alignment = <0x0 0x100000>;
+- 			//no-map;
++			size = <0x0 0x6000000>;
++			alignment = <0x0 0x800000>;
+ 		};
+ 	};
+ 

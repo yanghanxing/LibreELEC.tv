@@ -77,6 +77,10 @@ case "$TARGET_FPU" in
     ;;
 esac
 
+if [ "$TARGET_ARCH" = "aarch64" ]; then
+  FFMPEG_FPU="--enable-neon"
+fi
+
 if [ "$DISPLAYSERVER" = "x11" ]; then
   FFMPEG_X11GRAB="--enable-indev=x11grab_xcb"
 fi

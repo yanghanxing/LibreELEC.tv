@@ -73,11 +73,19 @@ post_makeinstall_target() {
   rm -rf $INSTALL/usr/bin/ciptool
   rm -rf $INSTALL/usr/share/dbus-1
 
-  mkdir -p $INSTALL/etc/bluetooth
-    cp src/main.conf $INSTALL/etc/bluetooth
-    sed -i $INSTALL/etc/bluetooth/main.conf \
+  rm -rf $INSTALL/etc/bluetooth
+    ln -sf /storage/.config/bluetooth $INSTALL/etc/bluetooth
+
+  mkdir -p $INSTALL/usr/config
+    cp -PR $PKG_DIR/config/* $INSTALL/usr/config
+
+  mkdir -p $INSTALL/usr/config/bluetooth
+    cp -PR $ROOT/$PKG_BUILD/src/main.conf $INSTALL/usr/config/bluetooth
+    sed -i $INSTALL/usr/config/bluetooth/main.conf \
         -e "s|^#\[Policy\]|\[Policy\]|g" \
         -e "s|^#AutoEnable.*|AutoEnable=true|g"
+    cp -PR $ROOT/$PKG_BUILD/profiles/proximity/proximity.conf $INSTALL/usr/config/bluetooth
+    cp -PR $ROOT/$PKG_BUILD/profiles/network/network.conf $INSTALL/usr/config/bluetooth
 }
 
 post_install() {

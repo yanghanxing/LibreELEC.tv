@@ -16,6 +16,7 @@ OpenPHT-Embedded is a 'Just enough OS' Linux distribution for running [OpenPHT](
 * `DISTRO=OpenPHT PROJECT=WeTek_Play_2 ARCH=aarch64 make image`
 * `DISTRO=OpenPHT PROJECT=WeTek_Hub ARCH=aarch64 make image`
 * `DISTRO=OpenPHT PROJECT=Odroid_C2 ARCH=aarch64 make image`
+* `DISTRO=OpenPHT PROJECT=Intel_EGL ARCH=x86_64 make image`
 * Use `OPENPHT_REPO`, `OPENPHT_SETTINGS_REPO` and `OPENPHT_BRANCH` to change what repository and branch of OpenPHT(-settings) to build
 
 # LibreELEC

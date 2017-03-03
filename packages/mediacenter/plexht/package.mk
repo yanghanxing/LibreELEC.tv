@@ -196,7 +196,7 @@ else
   CMAKE_BUILD_TYPE="RelWithDebInfo"
 fi
 
-if [ $PROJECT = "RPi" -o $PROJECT = "RPi2" ]; then
+if [ "$KODIPLAYER_DRIVER" = bcm2835-driver ]; then
   export PYTHON_EXEC="$SYSROOT_PREFIX/usr/bin/python2.7"
   cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=$CMAKE_CONF \
         -DENABLE_PYTHON=ON \
@@ -212,6 +212,27 @@ if [ $PROJECT = "RPi" -o $PROJECT = "RPi2" ]; then
         -DENABLE_AUTOUPDATE=ON \
         -DTARGET_PLATFORM=RPI \
         -DRPI_PROJECT=$PROJECT \
+        -DOPENELEC=ON \
+        -DLIRC_DEVICE=/run/lirc/lircd \
+        -DCMAKE_INSTALL_PREFIX=/usr/lib/plexht \
+        -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE \
+        ..
+elif [ "$KODIPLAYER_DRIVER" = libamcodec ]; then
+  export PYTHON_EXEC="$SYSROOT_PREFIX/usr/bin/python2.7"
+  cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=$CMAKE_CONF \
+        -DENABLE_PYTHON=ON \
+        -DEXTERNAL_PYTHON_HOME="$SYSROOT_PREFIX/usr" \
+        -DPYTHON_EXEC="$PYTHON_EXEC" \
+        -DSWIG_EXECUTABLE=`which swig` \
+        -DSWIG_DIR="$ROOT/$BUILD/toolchain" \
+        -DCMAKE_PREFIX_PATH="$SYSROOT_PREFIX" \
+        -DCMAKE_LIBRARY_PATH="$SYSROOT_PREFIX/usr/lib" \
+        -DCMAKE_INCLUDE_PATH="$SYSROOT_PREFIX/usr/include;$SYSROOT_PREFIX/usr/include/python2.7" \
+        -DCOMPRESS_TEXTURES=OFF \
+        -DENABLE_DUMP_SYMBOLS=ON \
+        -DENABLE_AUTOUPDATE=ON \
+        -DTARGET_PLATFORM=AML \
+        -DUSE_INTERNAL_FFMPEG=OFF \
         -DOPENELEC=ON \
         -DLIRC_DEVICE=/run/lirc/lircd \
         -DCMAKE_INSTALL_PREFIX=/usr/lib/plexht \

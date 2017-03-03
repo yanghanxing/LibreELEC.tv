@@ -29,5 +29,3 @@ PKG_LONGDESC="libmodplug renders mod music files as raw audio data, for playing 
 
 PKG_IS_ADDON="no"
 PKG_AUTORECONF="no"
-
-PKG_CONFIGURE_OPTS_TARGET="--enable-static --disable-shared"

@@ -46,3 +46,13 @@ if [ "$MEDIACENTER" = "kodi" ]; then
                                           xmlstarlet \
                                           peripheral.joystick"
 fi
+
+if [ "$MEDIACENTER" = "plexht" ]; then
+# some python stuff needed for various addons
+  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET Pillow \
+                                          simplejson \
+                                          pycrypto"
+# other packages
+  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET OpenPHT-settings \
+                                          xmlstarlet"
+fi

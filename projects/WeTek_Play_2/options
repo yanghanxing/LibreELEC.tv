@@ -59,8 +59,17 @@
 # setup build defaults
 ################################################################################
 
+  # Build optimizations (size/normal)
+    OPTIMIZATIONS="size"
+
   # Project CFLAGS
     PROJECT_CFLAGS=""
+
+  # LTO (Link Time Optimization) support
+    LTO_SUPPORT="yes"
+
+  # GOLD (Google Linker) support
+    GOLD_SUPPORT="yes"
 
   # SquashFS compression method (gzip / lzo / xz)
     SQUASHFS_COMPRESSION="lzo"
@@ -105,12 +114,12 @@
   # for a list of additinoal drivers see packages/linux-drivers
   # Space separated list is supported,
   # e.g. ADDITIONAL_DRIVERS="DRIVER1 DRIVER2"
-    ADDITIONAL_DRIVERS="gpu-aml brcmap6xxx-aml wetekdvb"
+    ADDITIONAL_DRIVERS="gpu-aml brcmap6xxx-aml"
 
   # additional Firmware to use (dvb-firmware, misc-firmware, wlan-firmware)
   # Space separated list is supported,
   # e.g. FIRMWARE="dvb-firmware misc-firmware wlan-firmware"
-    FIRMWARE="misc-firmware wlan-firmware dvb-firmware brcmfmac_sdio-firmware-aml"
+    FIRMWARE="misc-firmware wlan-firmware brcmfmac_sdio-firmware-aml"
 
   # build and install ATV IR remote support (yes / no)
     ATVCLIENT_SUPPORT="no"

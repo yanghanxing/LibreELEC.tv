@@ -17,14 +17,12 @@
 ################################################################################
 
 PKG_NAME="ffmpeg"
-# Current branch is: release/3.1-xbmc
-PKG_VERSION="33c167d"
+PKG_VERSION="2.8.11"
 PKG_ARCH="any"
 PKG_LICENSE="LGPLv2.1+"
 PKG_SITE="https://ffmpeg.org"
-PKG_URL="https://github.com/xbmc/FFmpeg/archive/${PKG_VERSION}.tar.gz"
-PKG_SOURCE_DIR="FFmpeg-${PKG_VERSION}*"
-PKG_DEPENDS_TARGET="toolchain yasm:host zlib bzip2 openssl speex"
+PKG_URL="https://ffmpeg.org/releases/${PKG_NAME}-${PKG_VERSION}.tar.gz"
+PKG_DEPENDS_TARGET="toolchain yasm:host zlib bzip2 libvorbis openssl dcadec speex"
 PKG_SECTION="multimedia"
 PKG_SHORTDESC="FFmpeg is a complete, cross-platform solution to record, convert and stream audio and video."
 PKG_LONGDESC="FFmpeg is a complete, cross-platform solution to record, convert and stream audio and video."
@@ -117,7 +115,7 @@ configure_target() {
               --host-ldflags="$HOST_LDFLAGS" \
               --host-libs="-lm" \
               --extra-cflags="$CFLAGS" \
-              --extra-ldflags="$LDFLAGS" \
+              --extra-ldflags="$LDFLAGS -fPIC" \
               --extra-libs="$FFMPEG_LIBS" \
               --disable-static \
               --enable-shared \
@@ -188,6 +186,7 @@ configure_target() {
               --disable-libopencore-amrwb \
               --disable-libopencv \
               --disable-libdc1394 \
+              --enable-libdcadec \
               --disable-libfaac \
               --disable-libfreetype \
               --disable-libgsm \
@@ -198,8 +197,9 @@ configure_target() {
               --disable-libschroedinger \
               --enable-libspeex \
               --disable-libtheora \
+              --disable-libvo-aacenc \
               --disable-libvo-amrwbenc \
-              --disable-libvorbis \
+              --enable-libvorbis --enable-muxer=ogg --enable-encoder=libvorbis \
               --disable-libvpx \
               --disable-libx264 \
               --disable-libxavs \

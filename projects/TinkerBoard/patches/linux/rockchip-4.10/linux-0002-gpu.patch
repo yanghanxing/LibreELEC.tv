@@ -1,0 +1,13 @@
+diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
+index f601c783..14671762 100644
+--- a/arch/arm/boot/dts/rk3288-tinker.dts
++++ b/arch/arm/boot/dts/rk3288-tinker.dts
+@@ -534,3 +534,8 @@
+ &wdt {
+ 	status = "okay";
+ };
++
++&gpu {
++  mali-supply = <&vdd_gpu>;
++  status = "okay";
++};

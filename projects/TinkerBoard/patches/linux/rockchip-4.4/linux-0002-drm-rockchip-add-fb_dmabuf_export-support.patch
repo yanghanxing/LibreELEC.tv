@@ -1,0 +1,49 @@
+From e74de5bf19f4ab13f9509e7dd85b553acfc49cd1 Mon Sep 17 00:00:00 2001
+From: Grzegorz Prajsner <grzegorz.prajsner@arm.com>
+Date: Wed, 24 Jun 2015 15:23:13 +0100
+Subject: [PATCH 2/5] drm/rockchip: add fb_dmabuf_export support
+
+Add support for fb_dmabuf_export call, which is executed when ioctl
+FBIOGET_DMABUF is called.
+
+Signed-off-by: Guillaume Tucker <guillaume.tucker@arm.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+index 8c9fa5a7c9de..48969aad2202 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+@@ -32,6 +32,23 @@ static int rockchip_fbdev_mmap(struct fb_info *info,
+ 	return rockchip_gem_mmap_buf(private->fbdev_bo, vma);
+ }
+ 
++static struct dma_buf *rockchip_fbdev_get_dma_buf(struct fb_info *info)
++{
++	struct dma_buf *buf = NULL;
++	struct drm_fb_helper *helper = info->par;
++	struct rockchip_drm_private *private = helper->dev->dev_private;
++	struct drm_device *dev = helper->dev;
++
++	if (dev->driver->gem_prime_export) {
++		buf = dev->driver->gem_prime_export(dev, private->fbdev_bo, O_RDWR);
++		if (buf) {
++			drm_gem_object_reference(private->fbdev_bo);
++		}
++	}
++
++	return buf;
++}
++
+ static struct fb_ops rockchip_drm_fbdev_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.fb_mmap	= rockchip_fbdev_mmap,
+@@ -43,6 +60,7 @@ static struct fb_ops rockchip_drm_fbdev_ops = {
+ 	.fb_blank	= drm_fb_helper_blank,
+ 	.fb_pan_display	= drm_fb_helper_pan_display,
+ 	.fb_setcmap	= drm_fb_helper_setcmap,
++	.fb_dmabuf_export	= rockchip_fbdev_get_dma_buf,
+ };
+ 
+ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,

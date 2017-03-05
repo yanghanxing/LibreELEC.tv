@@ -1,0 +1,83 @@
+From 282f0f401deb54d8474788c8fffce1690a94dd88 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Sun, 5 Mar 2017 17:30:26 +0100
+Subject: [PATCH 5/5] rk3288-miniarm: update dts
+
+---
+ arch/arm/boot/dts/rk3288-miniarm.dts | 13 +++++++++----
+ arch/arm/boot/dts/rk3288.dtsi        |  6 +++---
+ 2 files changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3288-miniarm.dts b/arch/arm/boot/dts/rk3288-miniarm.dts
+index eb88043b93e5..c8c21b5231d7 100644
+--- a/arch/arm/boot/dts/rk3288-miniarm.dts
++++ b/arch/arm/boot/dts/rk3288-miniarm.dts
+@@ -95,12 +95,17 @@
+ 		compatible = "gpio-leds";
+ 
+ 		pwr-led {
+-			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
++			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger = "default-on";
+ 		};
+ 
++		heartbeat-led {
++			gpios=<&gpio1 25 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger="heartbeat";
++		};
++
+ 		act-led {
+-			gpios=<&gpio2 3 GPIO_ACTIVE_LOW>;
++			gpios=<&gpio1 24 GPIO_ACTIVE_HIGH>;
+ 			linux,default-trigger="mmc0";
+ 		};
+ 	};
+@@ -162,7 +167,7 @@
+ 	pinctrl-0 = <&rgmii_pins>;
+ 	tx_delay = <0x30>;
+ 	rx_delay = <0x10>;
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &gpu {
+@@ -225,7 +230,7 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-min-microvolt = <750000>;
+-				regulator-max-microvolt = <1350000>;
++				regulator-max-microvolt = <1450000>;
+ 				regulator-name = "vdd_arm";
+ 				regulator-ramp-delay = <6000>;
+ 				regulator-state-mem {
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 52b21ec66fd9..0b4094cbdd11 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -1236,7 +1236,7 @@
+ 	mipi_dsi: mipi@ff960000 {
+ 		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
+ 		reg = <0xff960000 0x4000>;
+-		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_DSI0>;
+ 		clock-names = "ref", "pclk";
+ 		power-domains = <&power RK3288_PD_VIO>;
+@@ -1524,7 +1524,7 @@
+ 		#address-cells = <0>;
+ 
+ 		reg = <0xffc01000 0x1000>,
+-		      <0xffc02000 0x1000>,
++		      <0xffc02000 0x2000>,
+ 		      <0xffc04000 0x2000>,
+ 		      <0xffc06000 0x2000>;
+ 		interrupts = <GIC_PPI 9 0xf04>;
+@@ -1774,7 +1774,7 @@
+ 				rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 
+-			sdmmc_cd: sdmcc-cd {
++			sdmmc_cd: sdmmc-cd {
+ 				rockchip,pins = <6 22 RK_FUNC_1 &pcfg_pull_up>;
+ 			};
+ 

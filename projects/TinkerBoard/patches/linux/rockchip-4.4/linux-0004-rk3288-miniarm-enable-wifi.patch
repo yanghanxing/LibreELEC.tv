@@ -1,0 +1,82 @@
+From 327a6e4a54970b785c6f3d1e0b2e144a2bb4c6fc Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Sun, 5 Mar 2017 17:30:26 +0100
+Subject: [PATCH 4/5] rk3288-miniarm: enable wifi
+
+---
+ arch/arm/boot/dts/rk3288-miniarm.dts | 41 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288-miniarm.dts b/arch/arm/boot/dts/rk3288-miniarm.dts
+index 38b47ba7a371..eb88043b93e5 100644
+--- a/arch/arm/boot/dts/rk3288-miniarm.dts
++++ b/arch/arm/boot/dts/rk3288-miniarm.dts
+@@ -56,6 +56,22 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	sdio_pwrseq: sdio-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		clocks = <&rk808 1>;
++		clock-names = "ext_clock";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_enable_h>;
++
++		/*
++		 * On the module itself this is one of these (depending
++		 * on the actual card populated):
++		 * - SDIO_RESET_L_WL_REG_ON
++		 * - PDN (power down when low)
++		 */
++		reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		#address-cells = <1>;
+@@ -384,6 +400,7 @@
+ 	status = "okay";
+ 
+ 	sdcard-supply = <&vccio_sd>;
++	wifi-supply = <&vcc_18>;
+ };
+ 
+ &pwm0 {
+@@ -394,6 +411,24 @@
+ 	status = "okay";
+ };
+ 
++&sdio0 {
++	status = "okay";
++	clock-frequency = <50000000>;
++	clock-freq-min-max = <200000 50000000>;
++	bus-width = <4>;
++	cap-sd-highspeed;
++	cap-sdio-irq;
++	disable-wp;
++	keep-power-in-suspend;
++	mmc-pwrseq = <&sdio_pwrseq>;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk &sdio0_int>;
++	sd-uhs-sdr104;
++	supports-sdio;
++};
++
+ &saradc {
+ 	vref-supply = <&vcc18_ldo1>;
+ 	status ="okay";
+@@ -527,6 +562,12 @@
+ 		};
+ 	};
+ 
++	sdio-pwrseq {
++		wifi_enable_h: wifi-enable-h {
++			rockchip,pins = <4 28 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
+ 	sdmmc {
+ 		/*
+ 		 * Default drive strength isn't enough to achieve even

@@ -65,7 +65,8 @@
     OPENGL="no"
 
   # OpenGL-ES implementation to use (no / bcm2835-driver / gpu-viv-bin-mx6q)
-    OPENGLES="no"
+    OPENGLES="mali-t76x"
+    MALI_WINSYS="fbdev"
 
   # include uvesafb support (yes / no)
     UVESAFB_SUPPORT="no"

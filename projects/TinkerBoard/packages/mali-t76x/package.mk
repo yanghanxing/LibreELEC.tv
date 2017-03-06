@@ -22,11 +22,12 @@ if [ -z "$MALI_WINSYS" ]; then
 fi
 
 PKG_NAME="mali-t76x"
-PKG_VERSION="r12p0-04rel0"
+MALI_VERSION="r12p0-04rel0"
+PKG_VERSION="$MALI_VERSION-$MALI_WINSYS"
 PKG_ARCH="arm"
 PKG_LICENSE="nonfree"
 PKG_SITE="https://developer.arm.com/products/software/mali-drivers/user-space"
-PKG_URL="http://malideveloper.arm.com/downloads/drivers/binary/$PKG_VERSION/mali-t76x_${PKG_VERSION}_linux_1+$MALI_WINSYS.tar.gz"
+PKG_URL="http://malideveloper.arm.com/downloads/drivers/binary/$MALI_VERSION/mali-t76x_${MALI_VERSION}_linux_1+$MALI_WINSYS.tar.gz"
 PKG_SOURCE_DIR="$MALI_WINSYS"
 PKG_DEPENDS_TARGET="mesa-headers"
 PKG_SECTION="graphics"
@@ -46,8 +47,14 @@ make_target() {
 
 makeinstall_target() {
   mkdir -p $SYSROOT_PREFIX/usr/lib
-    cp -PR *.so* $SYSROOT_PREFIX/usr/lib
+    cp -PRv *.so* $SYSROOT_PREFIX/usr/lib
+
+  mkdir -p $SYSROOT_PREFIX/usr/lib/pkgconfig
+    cp -PRv $PKG_DIR/pkgconfig/*.pc $SYSROOT_PREFIX/usr/lib/pkgconfig
+
+  mkdir -p $SYSROOT_PREFIX/usr/lib/include
+    cp -PRv $PKG_DIR/include/* $SYSROOT_PREFIX/usr/lib/include
 
   mkdir -p $INSTALL/usr/lib
-    cp -PR *.so* $INSTALL/usr/lib
+    cp -PRv *.so* $INSTALL/usr/lib
 }

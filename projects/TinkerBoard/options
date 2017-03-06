@@ -66,7 +66,7 @@
 
   # OpenGL-ES implementation to use (no / bcm2835-driver / gpu-viv-bin-mx6q)
     OPENGLES="mali-t76x"
-    MALI_WINSYS="fbdev"
+    MALI_WINSYS="wayland"
 
   # include uvesafb support (yes / no)
     UVESAFB_SUPPORT="no"
@@ -115,7 +115,7 @@
   # for a list of additinoal drivers see packages/linux-drivers
   # Space separated list is supported,
   # e.g. ADDITIONAL_DRIVERS="DRIVER1 DRIVER2"
-    ADDITIONAL_DRIVERS=""
+    ADDITIONAL_DRIVERS="mpv"
 
   # Start boot partition at 16MiB, same as https://github.com/rockchip-linux/build images
     SYSTEM_PART_START=32768

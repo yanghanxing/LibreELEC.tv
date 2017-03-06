@@ -44,6 +44,7 @@ makeinstall_target() {
   mkdir -p $SYSROOT_PREFIX/usr/include
     cp -PR ../include/CL $SYSROOT_PREFIX/usr/include
     cp -PR ../include/EGL $SYSROOT_PREFIX/usr/include
+    cp -PR ../include/GL $SYSROOT_PREFIX/usr/include
     cp -PR ../include/GLES $SYSROOT_PREFIX/usr/include
     cp -PR ../include/GLES2 $SYSROOT_PREFIX/usr/include
     cp -PR ../include/GLES3 $SYSROOT_PREFIX/usr/include

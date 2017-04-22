@@ -1,0 +1,54 @@
+From 5c55039f74e7fcec4fe9cf263837504976a198ec Mon Sep 17 00:00:00 2001
+From: Huibin Hong <huibin.hong@rock-chips.com>
+Date: Fri, 3 Mar 2017 17:49:09 +0800
+Subject: [PATCH 12/45] arm64: dts: rockchip: add dmac nodes for rk3368 SoCs
+
+Add dmac bus and dmac peri dts nodes for peripherals,
+such as I2S, SPI, UART and so on.
+
+Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index a782a1351457..02714271d110 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -169,6 +169,35 @@
+ 		};
+ 	};
+ 
++	amba {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		dmac_peri: dma-controller@ff250000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff250000 0x0 0x4000>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			arm,pl330-broken-no-flushp;
++			clocks = <&cru ACLK_DMAC_PERI>;
++			clock-names = "apb_pclk";
++		};
++
++		dmac_bus: dma-controller@ff600000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff600000 0x0 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			arm,pl330-broken-no-flushp;
++			clocks = <&cru ACLK_DMAC_BUS>;
++			clock-names = "apb_pclk";
++		};
++	};
++
+ 	arm-pmu {
+ 		compatible = "arm,armv8-pmuv3";
+ 		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,

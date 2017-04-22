@@ -1,0 +1,30 @@
+From be1e3e24bcc5177a21df4d0425a91ccd008c7cde Mon Sep 17 00:00:00 2001
+From: Andy Yan <andy.yan@rock-chips.com>
+Date: Fri, 7 Apr 2017 16:19:29 +0800
+Subject: [PATCH 44/45] arm64: dts: rockchip: fix the memory size of PX5
+ Evaluation board
+
+Commit 122682b2abb6 ("arm64: dts: rockchip: Add PX5 Evaluation board")
+sets the memory size to 2 GB, but this board only has 1 GB DRAM, so change
+it to the correct value here.
+
+Fixes: 122682b2abb6 ("arm64: dts: rockchip: Add PX5 Evaluation board")
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+index 8cdb3bff9c55..ff48edd8e348 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+@@ -53,7 +53,7 @@
+ 	};
+ 
+ 	memory@0 {
+-		reg = <0x0 0x0 0x0 0x80000000>;
++		reg = <0x0 0x0 0x0 0x40000000>;
+ 		device_type = "memory";
+ 	};
+ 

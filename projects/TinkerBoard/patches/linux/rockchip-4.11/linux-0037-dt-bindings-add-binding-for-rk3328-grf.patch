@@ -1,0 +1,26 @@
+From d59748ce2c8ab6f205fba5a657ee3e44d92d12ae Mon Sep 17 00:00:00 2001
+From: Liang Chen <cl@rock-chips.com>
+Date: Mon, 27 Mar 2017 17:40:47 +0800
+Subject: [PATCH 37/45] dt-bindings: add binding for rk3328-grf
+
+This adds the compatible for the General Register Files on the new rk3328.
+
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/soc/rockchip/grf.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+index a0685c209218..de8b983f2ccd 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/grf.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+@@ -16,6 +16,7 @@ Required Properties:
+    - "rockchip,rk3188-grf", "syscon": for rk3188
+    - "rockchip,rk3228-grf", "syscon": for rk3228
+    - "rockchip,rk3288-grf", "syscon": for rk3288
++   - "rockchip,rk3328-grf", "syscon": for rk3328
+    - "rockchip,rk3368-grf", "syscon": for rk3368
+    - "rockchip,rk3399-grf", "syscon": for rk3399
+ - compatible: PMUGRF should be one of the following:

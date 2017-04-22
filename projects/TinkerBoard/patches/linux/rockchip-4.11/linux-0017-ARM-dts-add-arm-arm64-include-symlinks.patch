@@ -1,0 +1,37 @@
+From 10364e3494d0951ae8faaea797b6cf069c09ab15 Mon Sep 17 00:00:00 2001
+From: Heiko Stuebner <heiko@sntech.de>
+Date: Sun, 26 Feb 2017 07:00:57 +0100
+Subject: [PATCH 17/45] ARM: dts: add arm/arm64 include symlinks
+
+Allow including of dtsi files in an architecture-independent manner.
+Some dtsi files may be shared between architectures and one suggestion
+was to have symlinks and let these includes get accessed via a
+    #include <arm64/foo.dtsi>
+So add the necessary symlinks for arm32.
+
+Suggested-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/boot/dts/include/arm   | 1 +
+ arch/arm/boot/dts/include/arm64 | 1 +
+ 2 files changed, 2 insertions(+)
+ create mode 120000 arch/arm/boot/dts/include/arm
+ create mode 120000 arch/arm/boot/dts/include/arm64
+
+diff --git a/arch/arm/boot/dts/include/arm b/arch/arm/boot/dts/include/arm
+new file mode 120000
+index 000000000000..a96aa0ea9d8c
+--- /dev/null
++++ b/arch/arm/boot/dts/include/arm
+@@ -0,0 +1 @@
++..
+\ No newline at end of file
+diff --git a/arch/arm/boot/dts/include/arm64 b/arch/arm/boot/dts/include/arm64
+new file mode 120000
+index 000000000000..074a835fca3e
+--- /dev/null
++++ b/arch/arm/boot/dts/include/arm64
+@@ -0,0 +1 @@
++../../../../arm64/boot/dts
+\ No newline at end of file

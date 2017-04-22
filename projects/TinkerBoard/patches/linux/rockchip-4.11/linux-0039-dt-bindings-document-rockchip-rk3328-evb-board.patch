@@ -1,0 +1,30 @@
+From 1511672ce45f4b0f0a8ffc8aba9afe4b9613a7d8 Mon Sep 17 00:00:00 2001
+From: Liang Chen <cl@rock-chips.com>
+Date: Mon, 27 Mar 2017 17:46:23 +0800
+Subject: [PATCH 39/45] dt-bindings: document rockchip rk3328-evb board
+
+Use "rockchip,rk3328-evb" compatible string for Rockchip RK3328
+evaluation board.
+
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 3e05b62d7e26..250fdf02829a 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -157,6 +157,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+      - compatible = "rockchip,rk3288-fennec", "rockchip,rk3288";
+ 
++- Rockchip RK3328 evb:
++    Required root node properties:
++      - compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
++
+ - Rockchip RK3399 evb:
+     Required root node properties:
+       - compatible = "rockchip,rk3399-evb", "rockchip,rk3399";

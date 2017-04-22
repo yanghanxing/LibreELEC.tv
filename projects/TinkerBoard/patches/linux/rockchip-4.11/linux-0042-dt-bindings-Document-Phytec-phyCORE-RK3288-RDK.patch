@@ -1,0 +1,29 @@
+From 1c3db8aa4c95c29608619b5630d1183729777d62 Mon Sep 17 00:00:00 2001
+From: Wadim Egorov <w.egorov@phytec.de>
+Date: Thu, 6 Apr 2017 15:04:26 +0200
+Subject: [PATCH 42/45] dt-bindings: Document Phytec phyCORE-RK3288 RDK
+
+Add documentation for the PCM-947 carrier board, a RK3288 based
+development board made by PHYTEC.
+
+Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 250fdf02829a..c965d99e86c2 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -126,6 +126,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "mqmaker,miqi", "rockchip,rk3288";
+ 
++- Phytec phyCORE-RK3288: Rapid Development Kit
++    Required root node properties:
++     - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
++
+ - Rockchip PX3 Evaluation board:
+     Required root node properties:
+       - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";

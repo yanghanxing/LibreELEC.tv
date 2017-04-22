@@ -1,0 +1,103 @@
+From da5b8dfa66f8d17a20ab1c4108978663a3bb86c7 Mon Sep 17 00:00:00 2001
+From: Romain Perier <romain.perier@collabora.com>
+Date: Fri, 3 Feb 2017 15:38:00 +0100
+Subject: [PATCH 01/45] ARM: dts: rockchip: Add support for ES8388 to the Radxa
+ Rock 2
+
+This commit adds the DT definition of the es8388 i2c device
+found at address 0x10. It also adds the definition for connecting
+the Rockchip I2S to the es8388 analog output.
+
+This commit is based on the initial work that was done by Sjoerd Simons
+<sjoerd.simons@collabora.com> with some improvements.
+
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-rock2-som.dtsi   |  2 +-
+ arch/arm/boot/dts/rk3288-rock2-square.dts | 41 +++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+index 1c0bbc9b928b..f0778a46bca9 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
++++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+@@ -136,7 +136,7 @@
+ 				regulator-always-on;
+ 			};
+ 
+-			vcc_io: REG2 {
++			vcc_io: vccio_codec: REG2 {
+ 				regulator-name = "VCC_IO";
+ 				regulator-min-microvolt = <3300000>;
+ 				regulator-max-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
+index 96a2e745bb93..fbf11d410c42 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-square.dts
++++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+@@ -86,6 +86,19 @@
+ 		#sound-dai-cells = <0>;
+ 	};
+ 
++	sound-i2s {
++		compatible = "rockchip,rk3288-hdmi-analog";
++		pinctrl-names = "default";
++		pinctrl-0 = <&phone_ctl>, <&hp_det>;
++		rockchip,audio-codec = <&es8388>;
++		rockchip,hp-det-gpios = <&gpio7 7 GPIO_ACTIVE_HIGH>;
++		rockchip,hp-en-gpios = <&gpio8 0 GPIO_ACTIVE_HIGH>;
++		rockchip,i2s-controller = <&i2s>;
++		rockchip,model = "I2S";
++		rockchip,routing = "Analog", "LOUT2",
++				   "Analog", "ROUT2";
++	};
++
+ 	sdio_pwrseq: sdio-pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		clocks = <&hym8563>;
+@@ -173,10 +186,28 @@
+ 	};
+ };
+ 
++&i2c2 {
++	status = "okay";
++
++	es8388: es8388@10 {
++		compatible = "everest,es8388", "everest,es8328";
++		reg = <0x10>;
++		AVDD-supply = <&vccio_codec>;
++		DVDD-supply = <&vccio_codec>;
++		HPVDD-supply = <&vccio_codec>;
++		PVDD-supply = <&vccio_codec>;
++		clocks = <&cru SCLK_I2S0_OUT>;
++	};
++};
++
+ &i2c5 {
+ 	status = "okay";
+ };
+ 
++&i2s {
++	status = "okay";
++};
++
+ &pinctrl {
+ 	ir {
+ 		ir_int: ir-int {
+@@ -190,6 +221,16 @@
+ 		};
+ 	};
+ 
++	headphone {
++		hp_det: hp-det {
++			rockchip,pins = <7 7 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		phone_ctl: phone-ctl {
++			rockchip,pins = <8 0 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
+ 	usb {
+ 		host_vbus_drv: host-vbus-drv {
+ 			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;

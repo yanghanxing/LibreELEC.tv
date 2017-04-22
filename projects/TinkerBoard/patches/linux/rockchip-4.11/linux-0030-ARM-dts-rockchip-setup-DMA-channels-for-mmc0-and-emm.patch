@@ -1,0 +1,52 @@
+From 677794ae4ff791f8350bcbd78345d45f2241d670 Mon Sep 17 00:00:00 2001
+From: Alexander Kochetkov <al.kochet@gmail.com>
+Date: Tue, 21 Mar 2017 18:13:47 +0300
+Subject: [PATCH 30/45] ARM: dts: rockchip: setup DMA-channels for mmc0 and
+ emmc for rk3188
+
+This commit enable DMA-based transfers for SD/eMMC card adapters
+and reduce number of interrupts produced by SD-card/eMMC-card
+adapters.
+
+Sometimes interrupts from SD-card/eMMC-card adapters running in
+PIO mode blocks execution of hrtimers and I2S DMA callbacks for
+a long periods (100 ms or more).
+
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+[moved dma properties to rk3xxx.dtsi and added sdio dma]
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3xxx.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index c5b8592af73c..4aa6f60d6a22 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -223,6 +223,8 @@
+ 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+ 		clock-names = "biu", "ciu";
++		dmas = <&dmac2 1>;
++		dma-names = "rx-tx";
+ 		fifo-depth = <256>;
+ 		resets = <&cru SRST_SDMMC>;
+ 		reset-names = "reset";
+@@ -235,6 +237,8 @@
+ 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>;
+ 		clock-names = "biu", "ciu";
++		dmas = <&dmac2 3>;
++		dma-names = "rx-tx";
+ 		fifo-depth = <256>;
+ 		resets = <&cru SRST_SDIO>;
+ 		reset-names = "reset";
+@@ -247,6 +251,8 @@
+ 		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+ 		clock-names = "biu", "ciu";
++		dmas = <&dmac2 4>;
++		dma-names = "rx-tx";
+ 		fifo-depth = <256>;
+ 		resets = <&cru SRST_EMMC>;
+ 		reset-names = "reset";

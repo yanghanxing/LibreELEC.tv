@@ -1,0 +1,37 @@
+From 4ff131a69a44e8d5a2f83c18e9ecc3ceed3e34b2 Mon Sep 17 00:00:00 2001
+From: Heiko Stuebner <heiko@sntech.de>
+Date: Fri, 17 Mar 2017 09:38:06 +0100
+Subject: [PATCH 16/45] arm64: dts: rockchip: add rk3399 dw-mmc resets
+
+dw-mmc got its reset-properties specified, so add the softresets
+for it on the rk3399.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index d8dda8b97b43..6aa647629e82 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -285,6 +285,8 @@
+ 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
++		resets = <&cru SRST_SDIO0>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
+@@ -299,6 +301,8 @@
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		power-domains = <&power RK3399_PD_SD>;
++		resets = <&cru SRST_SDMMC>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 

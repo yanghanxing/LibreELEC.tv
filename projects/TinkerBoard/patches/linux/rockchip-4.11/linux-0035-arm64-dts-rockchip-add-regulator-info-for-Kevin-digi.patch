@@ -1,0 +1,36 @@
+From d5ad8fcbdfa1f1d1f08524bafa9f7fd4bd14f1f8 Mon Sep 17 00:00:00 2001
+From: Brian Norris <briannorris@chromium.org>
+Date: Mon, 20 Mar 2017 16:53:44 -0700
+Subject: [PATCH 35/45] arm64: dts: rockchip: add regulator info for Kevin
+ digitizer
+
+We need to enable this regulator before the digitizer can be used. Wacom
+recommended waiting for 100 ms before talking to the HID.
+
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+[store chip ident as comment until i2c multi-compatibles are sorted]
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+index fd24071320be..658bb9dc9dfd 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+@@ -223,11 +223,15 @@ ap_i2c_dig: &i2c2 {
+ 	i2c-scl-rising-time-ns = <300>;
+ 
+ 	digitizer: digitizer@9 {
++		/* wacom,w9013 */
+ 		compatible = "hid-over-i2c";
+ 		reg = <0x9>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&cpu1_dig_irq_l &cpu1_dig_pdct_l>;
+ 
++		vdd-supply = <&p3_3v_dig>;
++		post-power-on-delay-ms = <100>;
++
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
+ 

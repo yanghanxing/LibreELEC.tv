@@ -1,0 +1,28 @@
+From 72a312e2d6e1882a74cc34eda864f7225c911b5c Mon Sep 17 00:00:00 2001
+From: Eddie Cai <eddie.cai.linux@gmail.com>
+Date: Tue, 14 Feb 2017 18:07:30 +0800
+Subject: [PATCH 03/45] dt-bindings: add rk3288-based Asus Tinker board
+
+Tinker board is a credit card size develop board designed by Asus.
+Powered by RK3288.
+
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/arm/rockchip.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index cc4ace6397ab..226ee9131078 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -1,5 +1,8 @@
+ Rockchip platforms device tree bindings
+ ---------------------------------------
++- Asus Tinker board
++    Required root node properties:
++      - compatible = "asus,rk3288-tinker", "rockchip,rk3288";
+ 
+ - Kylin RK3036 board:
+     Required root node properties:

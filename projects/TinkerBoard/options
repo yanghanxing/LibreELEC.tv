@@ -47,6 +47,11 @@
       KERNEL_MAKE_EXTRACMD="rk3288-tinker.dtb"
     fi
 
+  # Fix linux rockchip-4.11 compile
+    if [ "$1" = "linux" -a "$LINUX" = "rockchip-4.11" ]; then
+      KERNEL_MAKE_EXTRACMD="rk3288-tinker.dtb"
+    fi
+
 ################################################################################
 # setup build defaults
 ################################################################################

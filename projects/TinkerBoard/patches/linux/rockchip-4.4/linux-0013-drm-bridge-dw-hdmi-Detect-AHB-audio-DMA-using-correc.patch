@@ -1,0 +1,59 @@
+From fc29120b92f8b078149657a8b0e01e7ff5c476be Mon Sep 17 00:00:00 2001
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Date: Tue, 17 Jan 2017 10:29:04 +0200
+Subject: [PATCH 13/18] drm: bridge: dw-hdmi: Detect AHB audio DMA using
+ correct register
+
+Bit 0 in CONFIG1_ID tells whether the IP core uses an AHB slave
+interface for control. The correct way to identify AHB audio DMA support
+is through bit 1 in CONFIG3_ID.
+
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Reviewed-by: Jose Abreu <joabreu@synopsys.com>
+Signed-off-by: Archit Taneja <architt@codeaurora.org>
+Link: http://patchwork.freedesktop.org/patch/msgid/20170117082910.27023-15-laurent.pinchart+renesas@ideasonboard.com
+---
+ drivers/gpu/drm/bridge/dw-hdmi.c | 6 +++---
+ drivers/gpu/drm/bridge/dw-hdmi.h | 4 ++++
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+index a25117765af4..c0ba57c9f2c8 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+@@ -2436,7 +2436,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 	int ret;
+ 	u32 val = 1;
+ 	u8 config0;
+-	u8 config1;
++	u8 config3;
+ 
+ 	hdmi = devm_kzalloc(dev, sizeof(*hdmi), GFP_KERNEL);
+ 	if (!hdmi)
+@@ -2592,9 +2592,9 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 	pdevinfo.id = PLATFORM_DEVID_AUTO;
+ 
+ 	config0 = hdmi_readb(hdmi, HDMI_CONFIG0_ID);
+-	config1 = hdmi_readb(hdmi, HDMI_CONFIG1_ID);
++	config3 = hdmi_readb(hdmi, HDMI_CONFIG3_ID);
+ 
+-	if (config1 & HDMI_CONFIG1_AHB) {
++	if (config3 & HDMI_CONFIG3_AHBAUDDMA) {
+ 		struct dw_hdmi_audio_data audio;
+ 
+ 		audio.phys = iores->start;
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.h b/drivers/gpu/drm/bridge/dw-hdmi.h
+index 2517cb38c0ba..403811665e93 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.h
++++ b/drivers/gpu/drm/bridge/dw-hdmi.h
+@@ -563,6 +563,10 @@ enum {
+ /* CONFIG1_ID field values */
+ 	HDMI_CONFIG1_AHB = 0x01,
+ 
++/* CONFIG3_ID field values */
++	HDMI_CONFIG3_AHBAUDDMA = 0x02,
++	HDMI_CONFIG3_GPAUD = 0x01,
++
+ /* IH_FC_INT2 field values */
+ 	HDMI_IH_FC_INT2_OVERFLOW_MASK = 0x03,
+ 	HDMI_IH_FC_INT2_LOW_PRIORITY_OVERFLOW = 0x02,

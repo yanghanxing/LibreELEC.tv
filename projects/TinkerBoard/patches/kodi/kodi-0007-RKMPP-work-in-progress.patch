@@ -1,0 +1,965 @@
+From c18b5a494525cf486c264fb8c299682227cbb9cd Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Thu, 20 Apr 2017 20:50:28 +0200
+Subject: [PATCH 7/7] RKMPP: work-in-progress
+
+---
+ .../VideoPlayer/DVDCodecs/Video/CMakeLists.txt     |   5 +
+ .../VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h    |   5 +
+ .../DVDCodecs/Video/DVDVideoCodecFFmpeg.cpp        |  35 ++++-
+ xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.cpp   | 166 +++++++++++++++++++++
+ xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.h     |  80 ++++++++++
+ .../VideoRenderers/HwDecRender/CMakeLists.txt      |   5 +
+ .../VideoRenderers/HwDecRender/RendererRKMPP.cpp   | 147 ++++++++++++++++++
+ .../VideoRenderers/HwDecRender/RendererRKMPP.h     |  61 ++++++++
+ .../VideoPlayer/VideoRenderers/RenderFormats.h     |   1 +
+ .../VideoPlayer/VideoRenderers/RenderManager.cpp   |  11 ++
+ xbmc/windowing/gbm/GBMUtils.cpp                    |  86 ++++++++++-
+ xbmc/windowing/gbm/GBMUtils.h                      |   8 +
+ xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp     |  24 ++-
+ xbmc/windowing/gbm/WinSystemGbmGLESContext.h       |   9 +-
+ 14 files changed, 637 insertions(+), 6 deletions(-)
+ create mode 100644 xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.cpp
+ create mode 100644 xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.h
+ create mode 100644 xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.cpp
+ create mode 100644 xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.h
+
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/CMakeLists.txt b/xbmc/cores/VideoPlayer/DVDCodecs/Video/CMakeLists.txt
+index 7ee3bb6cca..9fc5748c64 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/CMakeLists.txt
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/CMakeLists.txt
+@@ -58,6 +58,11 @@ if(IMX_FOUND)
+   list(APPEND HEADERS DVDVideoCodecIMX.h)
+ endif()
+ 
++if(RK_FOUND)
++  list(APPEND SOURCES RKMPP.cpp)
++  list(APPEND HEADERS RKMPP.h)
++endif()
++
+ if(CORE_SYSTEM_NAME STREQUAL android)
+   list(APPEND SOURCES DVDVideoCodecAndroidMediaCodec.cpp)
+   list(APPEND HEADERS DVDVideoCodecAndroidMediaCodec.h)
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h
+index a2da9de437..ca0ff909b7 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h
+@@ -51,6 +51,7 @@ class CDVDMediaCodecInfo;
+ class CDVDVideoCodecIMXBuffer;
+ class CMMALBuffer;
+ class CDVDAmlogicInfo;
++class CDVDDrmPrimeInfo;
+ 
+ 
+ // should be entirely filled by all codecs
+@@ -100,6 +101,10 @@ struct DVDVideoPicture
+       CDVDAmlogicInfo *amlcodec;
+     };
+ 
++    struct {
++      CDVDDrmPrimeInfo *drmprime;
++    };
++
+   };
+ 
+   unsigned int iFlags;
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecFFmpeg.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecFFmpeg.cpp
+index df2445d295..1e096a91fd 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecFFmpeg.cpp
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecFFmpeg.cpp
+@@ -61,6 +61,9 @@
+ #ifdef HAS_MMAL
+ #include "MMALFFmpeg.h"
+ #endif
++#ifdef HAS_RKMPP
++#include "RKMPP.h"
++#endif
+ #include "utils/StringUtils.h"
+ 
+ extern "C" {
+@@ -254,6 +257,21 @@ enum AVPixelFormat CDVDVideoCodecFFmpeg::GetFormat(struct AVCodecContext * avctx
+         dec->Release();
+     }
+ #endif
++
++#ifdef HAS_RKMPP
++    if (*cur == AV_PIX_FMT_RKMPP)
++    {
++      RKMPP::CDecoder* dec = new RKMPP::CDecoder(ctx->m_processInfo);
++      if (dec->Open(avctx, ctx->m_pCodecContext, *cur, ctx->m_uSurfacesCount))
++      {
++        ctx->m_processInfo.SetVideoPixelFormat(pixFmtName ? pixFmtName : "");
++        ctx->SetHardware(dec);
++        return *cur;
++      }
++      else
++        dec->Release();
++    }
++#endif
+     cur++;
+   }
+ 
+@@ -305,7 +323,7 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
+   m_hints = hints;
+   m_options = options;
+ 
+-  AVCodec* pCodec;
++  AVCodec* pCodec = NULL;
+ 
+   m_iOrientation = hints.orientation;
+ 
+@@ -321,7 +339,17 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
+   }
+   m_formats.push_back(AV_PIX_FMT_NONE); /* always add none to get a terminated list in ffmpeg world */
+ 
+-  pCodec = avcodec_find_decoder(hints.codec);
++#ifdef HAS_RKMPP
++  if (pCodec == NULL && hints.codec == AV_CODEC_ID_H264)
++    pCodec = avcodec_find_decoder_by_name("h264_rkmpp");
++  if (pCodec == NULL && hints.codec == AV_CODEC_ID_HEVC)
++    pCodec = avcodec_find_decoder_by_name("hevc_rkmpp");
++  if (pCodec == NULL && hints.codec == AV_CODEC_ID_VP8)
++    pCodec = avcodec_find_decoder_by_name("vp8_rkmpp");
++#endif
++
++  if (pCodec == NULL)
++    pCodec = avcodec_find_decoder(hints.codec);
+ 
+   if(pCodec == NULL)
+   {
+@@ -365,6 +393,9 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
+ #ifdef HAS_MMAL
+     tryhw = true;
+ #endif
++#ifdef HAS_RKMPP
++    tryhw = true;
++#endif
+     if (tryhw && m_decoderState == STATE_NONE)
+     {
+       m_decoderState = STATE_HW_SINGLE;
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.cpp
+new file mode 100644
+index 0000000000..cd9e01311e
+--- /dev/null
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.cpp
+@@ -0,0 +1,166 @@
++/*
++ *      Copyright (C) 2017 Team Kodi
++ *      http://kodi.tv
++ *
++ *  This Program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This Program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this Program; see the file COPYING.  If not, see
++ *  <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#include "RKMPP.h"
++
++#ifdef HAS_RKMPP
++
++#include "cores/VideoPlayer/Process/ProcessInfo.h"
++#include "cores/VideoPlayer/DVDClock.h"
++#include "DVDVideoCodec.h"
++#include "DVDCodecs/DVDCodecUtils.h"
++#include "settings/AdvancedSettings.h"
++#include "utils/log.h"
++#include "windowing/WindowingFactory.h"
++
++#undef CLASSNAME
++#define CLASSNAME "CDVDDrmPrimeInfo"
++
++CDVDDrmPrimeInfo::CDVDDrmPrimeInfo(AVFrame* frame)
++  : m_refs(0)
++  , m_frame(nullptr)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - create %p", CLASSNAME, __FUNCTION__, this);
++
++  // ref frame until MppFrame has been rendered
++  m_frame = av_frame_alloc();
++  if (m_frame)
++    av_frame_ref(m_frame, frame);
++
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - create %p refs:%ld frame:%p", CLASSNAME, __FUNCTION__, this, m_refs, m_frame);
++}
++
++CDVDDrmPrimeInfo::~CDVDDrmPrimeInfo()
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - destroy %p refs:%ld frame:%p", CLASSNAME, __FUNCTION__, this, m_refs, m_frame);
++
++  // unref frame to deinit MppFrame
++  av_frame_free(&m_frame);
++}
++
++CDVDDrmPrimeInfo* CDVDDrmPrimeInfo::Retain()
++{
++  AtomicIncrement(&m_refs);
++
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - retain %p refs:%ld frame:%p", CLASSNAME, __FUNCTION__, this, m_refs, m_frame);
++
++  return this;
++}
++
++long CDVDDrmPrimeInfo::Release()
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - release %p refs:%ld frame:%p", CLASSNAME, __FUNCTION__, this, m_refs, m_frame);
++
++  long count = AtomicDecrement(&m_refs);
++  if (count == 0)
++    delete this;
++  return count;
++}
++
++using namespace RKMPP;
++
++#undef CLASSNAME
++#define CLASSNAME "RKMPP::CDecoder"
++
++CDecoder::CDecoder(CProcessInfo& processInfo)
++  : m_processInfo(processInfo)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - create %p", CLASSNAME, __FUNCTION__, this);
++
++  m_avctx = nullptr;
++}
++
++CDecoder::~CDecoder()
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - destroy %p", CLASSNAME, __FUNCTION__, this);
++}
++
++bool CDecoder::Open(AVCodecContext* avctx, AVCodecContext* mainctx, enum AVPixelFormat fmt, unsigned int surfaces)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGNOTICE, "%s::%s - open %p avctx:%p mainctx:%p fmt:%d surfaces:%u", CLASSNAME, __FUNCTION__, this, avctx, mainctx, fmt, surfaces);
++
++  m_avctx = avctx;
++  mainctx->pix_fmt = fmt;
++
++  m_processInfo.SetVideoDeintMethod("none");
++
++  std::list<EINTERLACEMETHOD> deintMethods;
++  deintMethods.push_back(EINTERLACEMETHOD::VS_INTERLACEMETHOD_NONE);
++  m_processInfo.UpdateDeinterlacingMethods(deintMethods);
++
++  return true;
++}
++
++int CDecoder::Decode(AVCodecContext* avctx, AVFrame* frame)
++{
++  int status = Check(avctx);
++  if (status)
++    return status;
++
++  if (frame)
++    return VC_BUFFER | VC_PICTURE;
++  else
++    return VC_BUFFER;
++}
++
++bool CDecoder::GetPicture(AVCodecContext* avctx, AVFrame* frame, DVDVideoPicture* picture)
++{
++  CDVDVideoCodecFFmpeg* ctx = static_cast<CDVDVideoCodecFFmpeg *>(avctx->opaque);
++  bool ret = ctx->GetPictureCommon(picture);
++  if (!ret || !frame)
++    return false;
++
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - get picture %p avctx:%p width:%d height:%d pts:%" PRId64, CLASSNAME, __FUNCTION__, this, avctx, frame->width, frame->height, frame->pts);
++
++  picture->format = RENDER_FMT_RKMPP;
++  picture->drmprime = new CDVDDrmPrimeInfo(frame);
++  picture->pts = (double)frame->pts * DVD_TIME_BASE / AV_TIME_BASE;
++
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - get picture %p avctx:%p width:%d height:%d pts:%" PRId64 " drmprime:%p", CLASSNAME, __FUNCTION__, this, avctx, frame->width, frame->height, frame->pts, picture->drmprime);
++
++#ifdef HAVE_GBM
++    // inject video frame into gbm windowing system
++    //g_Windowing.SetVideoPlane(frame->width, frame->height, picture->drmprime->GetDrmPrime());
++#endif
++
++  return true;
++}
++
++int CDecoder::Check(AVCodecContext* avctx)
++{
++  return 0;
++}
++
++unsigned CDecoder::GetAllowedReferences()
++{
++  return 3;
++}
++
++#endif
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.h b/xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.h
+new file mode 100644
+index 0000000000..b1b12eafde
+--- /dev/null
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/RKMPP.h
+@@ -0,0 +1,80 @@
++/*
++ *      Copyright (C) 2017 Team Kodi
++ *      http://kodi.tv
++ *
++ *  This Program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This Program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this Program; see the file COPYING.  If not, see
++ *  <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#pragma once
++
++#ifdef HAS_RKMPP
++
++#include "DVDVideoCodecFFmpeg.h"
++
++extern "C" {
++#include "libavcodec/drmprime.h"
++#include "libavutil/buffer.h"
++#include "libavutil/frame.h"
++}
++
++class CProcessInfo;
++
++class CDVDDrmPrimeInfo
++{
++public:
++  CDVDDrmPrimeInfo(AVFrame* frame);
++
++  // reference counting
++  CDVDDrmPrimeInfo* Retain();
++  long Release();
++
++  av_drmprime* GetDrmPrime() const { return (av_drmprime*)m_frame->data[3]; }
++  uint32_t GetWidth() const { return m_frame->width; }
++  uint32_t GetHeight() const { return m_frame->height; }
++  int64_t GetPTS() const { return m_frame->pts; }
++
++private:
++  // private because we are reference counted
++  virtual ~CDVDDrmPrimeInfo();
++
++  long m_refs;
++  AVFrame* m_frame;
++};
++
++namespace RKMPP
++{
++
++class CDecoder
++  : public CDVDVideoCodecFFmpeg::IHardwareDecoder
++{
++public:
++  CDecoder(CProcessInfo& processInfo);
++  virtual ~CDecoder();
++  bool Open(AVCodecContext* avctx, AVCodecContext* mainctx, const enum AVPixelFormat, unsigned int surfaces = 0) override;
++  int Decode(AVCodecContext* avctx, AVFrame* frame) override;
++  bool GetPicture(AVCodecContext* avctx, AVFrame* frame, DVDVideoPicture* picture) override;
++  int Check(AVCodecContext* avctx) override;
++  unsigned GetAllowedReferences() override;
++  const std::string Name() override { return "rkmpp"; }
++
++protected:
++  AVCodecContext* m_avctx;
++  CProcessInfo& m_processInfo;
++};
++
++}
++
++#endif
+diff --git a/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/CMakeLists.txt b/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/CMakeLists.txt
+index 539cab57bd..2d09d090e3 100644
+--- a/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/CMakeLists.txt
++++ b/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/CMakeLists.txt
+@@ -43,6 +43,11 @@ if(IMX_FOUND)
+   list(APPEND HEADERS RendererIMX.h)
+ endif()
+ 
++if(RK_FOUND)
++  list(APPEND SOURCES RendererRKMPP.cpp)
++  list(APPEND HEADERS RendererRKMPP.h)
++endif()
++
+ if(CORE_SYSTEM_NAME STREQUAL android)
+   list(APPEND SOURCES RendererMediaCodec.cpp
+                       RendererMediaCodecSurface.cpp)
+diff --git a/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.cpp b/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.cpp
+new file mode 100644
+index 0000000000..96f59c43df
+--- /dev/null
++++ b/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.cpp
+@@ -0,0 +1,147 @@
++/*
++ *      Copyright (C) 2017 Team Kodi
++ *      http://kodi.tv
++ *
++ *  This Program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This Program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this Program; see the file COPYING.  If not, see
++ *  <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#include "RendererRKMPP.h"
++
++#ifdef HAS_RKMPP
++
++#include "cores/IPlayer.h"
++#include "cores/VideoPlayer/VideoRenderers/RenderCapture.h"
++#include "settings/AdvancedSettings.h"
++#include "settings/MediaSettings.h"
++#include "utils/GLUtils.h"
++#include "utils/log.h"
++#include "utils/SysfsUtils.h"
++#include "windowing/WindowingFactory.h"
++
++#undef CLASSNAME
++#define CLASSNAME "CRendererRKMPP"
++
++CRendererRKMPP::CRendererRKMPP()
++: m_last_info(nullptr)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - create %p", CLASSNAME, __FUNCTION__, this);
++}
++
++CRendererRKMPP::~CRendererRKMPP()
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - destroy %p", CLASSNAME, __FUNCTION__, this);
++
++  m_last_info = nullptr;
++}
++
++bool CRendererRKMPP::RenderCapture(CRenderCapture* capture)
++{
++  capture->BeginRender();
++  capture->EndRender();
++  return true;
++}
++
++void CRendererRKMPP::AddVideoPictureHW(DVDVideoPicture& picture, int index)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - add picture %p index:%d", CLASSNAME, __FUNCTION__, this, index);
++
++  YUVBUFFER& buf = m_buffers[index];
++  if (picture.drmprime)
++    buf.hwDec = picture.drmprime->Retain();
++}
++
++void CRendererRKMPP::ReleaseBuffer(int index)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - release buffer %p index:%d", CLASSNAME, __FUNCTION__, this, index);
++
++  YUVBUFFER& buf = m_buffers[index];
++  if (buf.hwDec)
++  {
++    CDVDDrmPrimeInfo* info = static_cast<CDVDDrmPrimeInfo *>(buf.hwDec);
++    SAFE_RELEASE(info);
++    buf.hwDec = nullptr;
++  }
++}
++
++bool CRendererRKMPP::NeedBuffer(int index)
++{
++  YUVBUFFER& buf = m_buffers[index];
++  return buf.hwDec == m_last_info;
++}
++
++int CRendererRKMPP::GetImageHook(YV12Image* image, int source, bool readonly)
++{
++  return source;
++}
++
++bool CRendererRKMPP::IsGuiLayer()
++{
++  return false;
++}
++
++bool CRendererRKMPP::Supports(ERENDERFEATURE feature)
++{
++  return false;
++}
++
++bool CRendererRKMPP::Supports(ESCALINGMETHOD method)
++{
++  return false;
++}
++
++bool CRendererRKMPP::LoadShadersHook()
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - load shaders hook %p", CLASSNAME, __FUNCTION__, this);
++
++  m_renderMethod = RENDER_BYPASS;
++  return false;
++}
++
++bool CRendererRKMPP::RenderHook(int index)
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "%s::%s - render hook %p index:%d", CLASSNAME, __FUNCTION__, this, index);
++
++  return true;
++}
++
++bool CRendererRKMPP::RenderUpdateVideoHook(bool clear, DWORD flags, DWORD alpha)
++{
++  CDVDDrmPrimeInfo* info = static_cast<CDVDDrmPrimeInfo *>(m_buffers[m_iYV12RenderBuffer].hwDec);
++  if (info)
++  {
++    if (m_last_info == info)
++      return true;
++
++    if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++      CLog::Log(LOGDEBUG, "%s::%s - render update video hook %p drmprime:%p pts:%" PRId64, CLASSNAME, __FUNCTION__, this, info, info->GetPTS());
++
++#ifdef HAVE_GBM
++    // inject video frame into gbm windowing system
++    g_Windowing.SetVideoPlane(info->GetWidth(), info->GetHeight(), info->GetDrmPrime());
++#endif
++
++    m_last_info = info;
++  }
++  return true;
++}
++
++#endif
+diff --git a/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.h b/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.h
+new file mode 100644
+index 0000000000..9b2d977bed
+--- /dev/null
++++ b/xbmc/cores/VideoPlayer/VideoRenderers/HwDecRender/RendererRKMPP.h
+@@ -0,0 +1,61 @@
++/*
++ *      Copyright (C) 2017 Team Kodi
++ *      http://kodi.tv
++ *
++ *  This Program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2, or (at your option)
++ *  any later version.
++ *
++ *  This Program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this Program; see the file COPYING.  If not, see
++ *  <http://www.gnu.org/licenses/>.
++ *
++ */
++
++#pragma once
++
++#include "system.h"
++
++#ifdef HAS_RKMPP
++
++#include "cores/VideoPlayer/VideoRenderers/LinuxRendererGLES.h"
++#include "DVDCodecs/Video/RKMPP.h"
++
++// TODO: replace CLinuxRendererGLES
++class CRendererRKMPP : public CLinuxRendererGLES
++{
++public:
++  CRendererRKMPP();
++  virtual ~CRendererRKMPP();
++
++  bool RenderCapture(CRenderCapture* capture) override;
++  void AddVideoPictureHW(DVDVideoPicture& picture, int index) override;
++  void ReleaseBuffer(int idx) override;
++  bool NeedBuffer(int idx) override;
++
++  // Player functions
++  bool IsGuiLayer() override;
++
++  // Feature support
++  bool Supports(ERENDERFEATURE feature) override;
++  bool Supports(ESCALINGMETHOD method) override;
++
++protected:
++
++  // hooks for hw dec renderer
++  bool LoadShadersHook() override;
++  bool RenderHook(int index) override;
++  int  GetImageHook(YV12Image* image, int source = AUTOSOURCE, bool readonly = false) override;
++  bool RenderUpdateVideoHook(bool clear, DWORD flags = 0, DWORD alpha = 255) override;
++
++private:
++  CDVDDrmPrimeInfo* m_last_info;
++};
++
++#endif
+diff --git a/xbmc/cores/VideoPlayer/VideoRenderers/RenderFormats.h b/xbmc/cores/VideoPlayer/VideoRenderers/RenderFormats.h
+index 39f62fa616..f1b9b3e85b 100644
+--- a/xbmc/cores/VideoPlayer/VideoRenderers/RenderFormats.h
++++ b/xbmc/cores/VideoPlayer/VideoRenderers/RenderFormats.h
+@@ -45,6 +45,7 @@ enum ERenderFormat {
+   RENDER_FMT_IMXMAP,
+   RENDER_FMT_MMAL,
+   RENDER_FMT_AML,
++  RENDER_FMT_RKMPP,
+ };
+ 
+ struct CRenderInfo
+diff --git a/xbmc/cores/VideoPlayer/VideoRenderers/RenderManager.cpp b/xbmc/cores/VideoPlayer/VideoRenderers/RenderManager.cpp
+index 420b5b5d8e..71e8c3ab65 100644
+--- a/xbmc/cores/VideoPlayer/VideoRenderers/RenderManager.cpp
++++ b/xbmc/cores/VideoPlayer/VideoRenderers/RenderManager.cpp
+@@ -55,6 +55,9 @@
+ #if defined(HAS_LIBAMCODEC)
+ #include "HwDecRender/RendererAML.h"
+ #endif
++#if defined(HAS_RKMPP)
++#include "HwDecRender/RendererRKMPP.h"
++#endif
+ #if defined(HAVE_LIBOPENMAX)
+ #include "HwDecRender/RendererOpenMax.h"
+ #endif
+@@ -111,6 +114,7 @@ static std::string GetRenderFormatName(ERenderFormat format)
+     case RENDER_FMT_IMXMAP:    return "IMXMAP";
+     case RENDER_FMT_MMAL:      return "MMAL";
+     case RENDER_FMT_AML:       return "AMLCODEC";
++    case RENDER_FMT_RKMPP:     return "RKMPP";
+     case RENDER_FMT_NONE:      return "NONE";
+   }
+   return "UNKNOWN";
+@@ -582,6 +586,12 @@ void CRenderManager::CreateRenderer()
+       m_pRenderer = new CRendererAML;
+ #endif
+     }
++    else if (m_format == RENDER_FMT_RKMPP)
++    {
++#if defined(HAS_RKMPP)
++      m_pRenderer = new CRendererRKMPP;
++#endif
++    }
+     else if (m_format != RENDER_FMT_NONE)
+     {
+ #if defined(HAS_MMAL)
+@@ -1146,6 +1156,7 @@ int CRenderManager::AddVideoPicture(DVDVideoPicture& pic)
+   || pic.format == RENDER_FMT_MEDIACODEC
+   || pic.format == RENDER_FMT_MEDIACODECSURFACE
+   || pic.format == RENDER_FMT_AML
++  || pic.format == RENDER_FMT_RKMPP
+   || pic.format == RENDER_FMT_IMXMAP
+   || pic.format == RENDER_FMT_MMAL
+   || m_pRenderer->IsPictureHW(pic))
+diff --git a/xbmc/windowing/gbm/GBMUtils.cpp b/xbmc/windowing/gbm/GBMUtils.cpp
+index 6a67fed2e2..325363ab68 100644
+--- a/xbmc/windowing/gbm/GBMUtils.cpp
++++ b/xbmc/windowing/gbm/GBMUtils.cpp
+@@ -21,6 +21,7 @@
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <poll.h>
++#include <stdint.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -32,6 +33,7 @@
+ #include "guilib/gui3d.h"
+ #include "utils/log.h"
+ #include "settings/Settings.h"
++#include "settings/AdvancedSettings.h"
+ 
+ #include "GBMUtils.h"
+ 
+@@ -42,6 +44,7 @@ static struct gbm_bo *m_bo = nullptr;
+ static struct gbm_bo *m_next_bo = nullptr;
+ 
+ static drmModeResPtr m_drm_resources = nullptr;
++static drmModePlaneResPtr m_drm_plane_resources = nullptr;
+ static drmModeConnectorPtr m_drm_connector = nullptr;
+ static drmModeEncoderPtr m_drm_encoder = nullptr;
+ static drmModeCrtcPtr m_orig_crtc = nullptr;
+@@ -174,7 +177,7 @@ drm_fb * CGBMUtils::DrmFbGetFromBo(struct gbm_bo *bo)
+   auto ret = drmModeAddFB(m_drm->fd,
+                           width,
+                           height,
+-                          24,
++                          32,
+                           32,
+                           stride,
+                           handle,
+@@ -273,6 +276,61 @@ void CGBMUtils::FlipPage()
+   WaitingForFlip();
+ }
+ 
++void CGBMUtils::SetVideoPlane(uint32_t width, uint32_t height, av_drmprime* drmprime)
++{
++  uint32_t gem_handle;
++  int ret;
++  uint32_t pitches[4] = { 0, 0, 0, 0 };
++  uint32_t offsets[4] = { 0, 0, 0, 0 };
++  uint32_t handles[4] = { 0, 0, 0, 0 };
++  uint32_t fb_id = 0;
++
++  ret = drmPrimeFDToHandle(m_drm->fd, drmprime->fd, &gem_handle);
++  if (ret < 0) {
++    CLog::Log(LOGERROR, "CGBMUtils::%s - failed to retrieve the Prime Handle", __FUNCTION__);
++    return;
++  }
++
++  handles[0] = gem_handle;
++  pitches[0] = drmprime->strides[0];
++  offsets[0] = drmprime->offsets[0];
++
++  handles[1] = gem_handle;
++  pitches[1] = drmprime->strides[1];
++  offsets[1] = drmprime->offsets[1];
++
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "CGBMUtils::%s - set video plane width:%u height:%u hor_stride:%u ver_stride:%u hdisplay:%d vdisplay:%d", __FUNCTION__, width, height, drmprime->strides[0], drmprime->offsets[1] / drmprime->strides[1], m_drm->mode->hdisplay, m_drm->mode->vdisplay);
++
++  ret = drmModeAddFB2(m_drm->fd, width, height, drmprime->format, handles, pitches, offsets, &fb_id, 0);
++  if (ret < 0) {
++    CLog::Log(LOGERROR, "CGBMUtils::%s - failed add drm layer %d", __FUNCTION__, fb_id);
++    return;
++  }
++
++  int32_t crtc_x = 0;
++  int32_t crtc_y = 0;
++  uint32_t crtc_w = m_drm->mode->hdisplay;
++  uint32_t crtc_h = m_drm->mode->vdisplay;
++  uint32_t src_x = 0;
++  uint32_t src_y = 0;
++  uint32_t src_w = width << 16;
++  uint32_t src_h = height << 16;
++
++  ret = drmModeSetPlane(m_drm->fd, m_drm->video_plane_id, m_drm->crtc_id, fb_id, 0,
++                        crtc_x, crtc_y, crtc_w, crtc_h,
++                        src_x, src_y, src_w, src_h);
++  if (ret < 0) {
++    CLog::Log(LOGERROR, "CGBMUtils::%s - failed to set the plane %d (buffer %d)", __FUNCTION__, m_drm->video_plane_id, fb_id);
++    return;
++  }
++
++  if (m_drm->video_fb_id)
++    drmModeRmFB(m_drm->fd, m_drm->video_fb_id);
++
++  m_drm->video_fb_id = fb_id;
++}
++
+ bool CGBMUtils::GetResources()
+ {
+   m_drm_resources = drmModeGetResources(m_drm->fd);
+@@ -281,6 +339,12 @@ bool CGBMUtils::GetResources()
+     return false;
+   }
+ 
++  m_drm_plane_resources = drmModeGetPlaneResources(m_drm->fd);
++  if (!m_drm_plane_resources)
++  {
++    return false;
++  }
++
+   return true;
+ }
+ 
+@@ -411,6 +475,18 @@ drm * CGBMUtils::InitDrm()
+     }
+   }
+ 
++  m_drm->video_plane_id = 0;
++  for (uint32_t i = 0; i < m_drm_plane_resources->count_planes; i++)
++  {
++    drmModePlane *plane = drmModeGetPlane(m_drm->fd, m_drm_plane_resources->planes[i]);
++    if (!plane)
++      continue;
++    if (!m_drm->video_plane_id && plane->possible_crtcs & (1 << m_drm->crtc_index))
++      m_drm->video_plane_id = plane->plane_id;
++    drmModeFreePlane(plane);
++  }
++
++  drmModeFreePlaneResources(m_drm_plane_resources);
+   drmModeFreeResources(m_drm_resources);
+ 
+   drmSetMaster(m_drm->fd);
+@@ -485,6 +561,11 @@ void CGBMUtils::DestroyDrm()
+     drmModeFreeConnector(m_drm_connector);
+   }
+ 
++  if (m_drm_plane_resources)
++  {
++     drmModeFreePlaneResources(m_drm_plane_resources);
++  }
++
+   if(m_drm_resources)
+   {
+     drmModeFreeResources(m_drm_resources);
+@@ -496,6 +577,7 @@ void CGBMUtils::DestroyDrm()
+   m_drm_encoder = nullptr;
+   m_drm_connector = nullptr;
+   m_drm_resources = nullptr;
++  m_drm_plane_resources = nullptr;
+ 
+   m_drm->connector = nullptr;
+   m_drm->connector_id = 0;
+@@ -503,6 +585,8 @@ void CGBMUtils::DestroyDrm()
+   m_drm->crtc_id = 0;
+   m_drm->crtc_index = 0;
+   m_drm->fd = 0;
++  m_drm->video_plane_id = 0;
++  m_drm->video_fb_id = 0;
+   m_drm->gbm = nullptr;
+   m_drm->mode = nullptr;
+ 
+diff --git a/xbmc/windowing/gbm/GBMUtils.h b/xbmc/windowing/gbm/GBMUtils.h
+index aaf7074623..33454d5b4d 100644
+--- a/xbmc/windowing/gbm/GBMUtils.h
++++ b/xbmc/windowing/gbm/GBMUtils.h
+@@ -27,6 +27,10 @@
+ 
+ #include "guilib/Resolution.h"
+ 
++extern "C" {
++#include "libavcodec/drmprime.h"
++}
++
+ struct gbm
+ {
+   struct gbm_device *dev;
+@@ -61,6 +65,9 @@ struct drm
+   drmModeModeInfo *mode;
+   uint32_t crtc_id;
+   uint32_t connector_id;
++
++  uint32_t video_plane_id;
++  uint32_t video_fb_id;
+ };
+ 
+ struct drm_fb
+@@ -76,6 +83,7 @@ public:
+   static bool InitGbm(RESOLUTION_INFO res);
+   static void DestroyGbm();
+   static bool SetVideoMode(RESOLUTION_INFO res);
++  static void SetVideoPlane(uint32_t width, uint32_t height, av_drmprime* drmprime);
+   static void FlipPage();
+   static void DestroyDrm();
+   static bool GetModes(std::vector<RESOLUTION_INFO> &resolutions);
+diff --git a/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp b/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp
+index 89ede12c92..2da42d75f4 100644
+--- a/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp
++++ b/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp
+@@ -19,6 +19,8 @@
+  */
+ 
+ #include "WinSystemGbmGLESContext.h"
++#include "linux/XTimeUtils.h"
++#include "settings/AdvancedSettings.h"
+ #include "utils/log.h"
+ 
+ bool CWinSystemGbmGLESContext::InitWindowSystem()
+@@ -90,13 +92,23 @@ bool CWinSystemGbmGLESContext::SetFullScreen(bool fullScreen, RESOLUTION_INFO& r
+   return true;
+ }
+ 
+-void CWinSystemGbmGLESContext::PresentRenderImpl(bool rendered)
++void CWinSystemGbmGLESContext::PresentRender(bool rendered, bool videoLayer)
+ {
+-  if (rendered)
++  if (!m_bRenderCreated)
++    return;
++
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "CWinSystemGbmGLESContext::%s - present render %p rendered:%d videoLayer:%d", __FUNCTION__, this, rendered, videoLayer);
++
++  if (rendered || videoLayer)
+   {
+     m_pGLContext.SwapBuffers();
+     CGBMUtils::FlipPage();
+   }
++
++  // if video is rendered to a separate layer, we should not block this thread
++  if (!rendered && !videoLayer)
++    Sleep(40);
+ }
+ 
+ EGLDisplay CWinSystemGbmGLESContext::GetEGLDisplay() const
+@@ -118,3 +130,11 @@ EGLConfig  CWinSystemGbmGLESContext::GetEGLConfig() const
+ {
+   return m_pGLContext.m_eglConfig;
+ }
++
++void CWinSystemGbmGLESContext::SetVideoPlane(uint32_t width, uint32_t height, av_drmprime* drmprime) const
++{
++  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
++    CLog::Log(LOGDEBUG, "CWinSystemGbmGLESContext::%s - set video plane %p width:%u height:%u drmprime:%p", __FUNCTION__, this, width, height, drmprime);
++
++  CGBMUtils::SetVideoPlane(width, height, drmprime);
++}
+diff --git a/xbmc/windowing/gbm/WinSystemGbmGLESContext.h b/xbmc/windowing/gbm/WinSystemGbmGLESContext.h
+index 55d3145f2f..8945f06e03 100644
+--- a/xbmc/windowing/gbm/WinSystemGbmGLESContext.h
++++ b/xbmc/windowing/gbm/WinSystemGbmGLESContext.h
+@@ -25,6 +25,10 @@
+ #include "utils/GlobalsHandling.h"
+ #include "WinSystemGbm.h"
+ 
++extern "C" {
++#include "libavcodec/drmprime.h"
++}
++
+ class CWinSystemGbmGLESContext : public CWinSystemGbm, public CRenderSystemGLES
+ {
+ public:
+@@ -38,13 +42,16 @@ public:
+                        PHANDLE_EVENT_FUNC userFunction) override;
+ 
+   bool SetFullScreen(bool fullScreen, RESOLUTION_INFO& res, bool blankOtherDisplays) override;
++  void PresentRender(bool rendered, bool videoLayer) override;
+   EGLDisplay GetEGLDisplay() const;
+   EGLSurface GetEGLSurface() const;
+   EGLContext GetEGLContext() const;
+   EGLConfig  GetEGLConfig() const;
++
++  void SetVideoPlane(uint32_t width, uint32_t height, av_drmprime* drmprime) const;
+ protected:
+   void SetVSyncImpl(bool enable) override { return; };
+-  void PresentRenderImpl(bool rendered) override;
++  void PresentRenderImpl(bool rendered) override { };
+ 
+ private:
+   CGLContextEGL m_pGLContext;

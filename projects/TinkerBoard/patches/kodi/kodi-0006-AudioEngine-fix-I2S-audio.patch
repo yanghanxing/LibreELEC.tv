@@ -1,0 +1,22 @@
+From b6731abc4183855e7314a44036ad0c7b45d2011e Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Wed, 5 Apr 2017 07:51:24 +0200
+Subject: [PATCH 6/7] AudioEngine: fix I2S audio
+
+---
+ xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+index d66993a095..7798715b60 100644
+--- a/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
++++ b/xbmc/cores/AudioEngine/Sinks/AESinkALSA.cpp
+@@ -720,7 +720,7 @@ bool CAESinkALSA::InitializeHW(const ALSAConfig &inconfig, ALSAConfig &outconfig
+       {
+         /* if we opened in 32bit and only have 24bits, signal it accordingly */
+         if (fmtBits == 32 && bits == 24)
+-          i = AE_FMT_S24NE4MSB;
++          i = AE_FMT_S24NE4;
+         else
+           continue;
+       }

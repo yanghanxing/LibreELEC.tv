@@ -1,0 +1,37 @@
+From 368bf404342f621fa48cbfba1acd0447195bde79 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Tue, 18 Apr 2017 11:49:04 -0700
+Subject: [PATCH 4/7] windowing/gbm: use largest display mode when no preferred
+
+---
+ xbmc/windowing/gbm/GBMUtils.cpp | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/xbmc/windowing/gbm/GBMUtils.cpp b/xbmc/windowing/gbm/GBMUtils.cpp
+index e519c6cb9c..6a67fed2e2 100644
+--- a/xbmc/windowing/gbm/GBMUtils.cpp
++++ b/xbmc/windowing/gbm/GBMUtils.cpp
+@@ -333,7 +333,7 @@ bool CGBMUtils::GetEncoder()
+ 
+ bool CGBMUtils::GetPreferredMode()
+ {
+-  for(auto i = 0; i < m_drm_connector->count_modes; i++)
++  for(auto i = 0, area = 0; i < m_drm_connector->count_modes; i++)
+   {
+     drmModeModeInfo *current_mode = &m_drm_connector->modes[i];
+ 
+@@ -347,6 +347,14 @@ bool CGBMUtils::GetPreferredMode()
+                 m_drm->mode->vdisplay,
+                 m_drm->mode->flags & DRM_MODE_FLAG_INTERLACE ? "i" : "",
+                 m_drm->mode->vrefresh);
++      break;
++    }
++
++    auto current_area = current_mode->hdisplay * current_mode->vdisplay;
++    if (current_area > area)
++    {
++      m_drm->mode = current_mode;
++      area = current_area;
+     }
+   }
+ 

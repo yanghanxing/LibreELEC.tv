@@ -48,3 +48,5 @@ This is an experimental project for the ASUS Tinker Board.
 * `PROJECT=TinkerBoard ARCH=arm MEDIACENTER=glmark2 make image`
 * `PROJECT=TinkerBoard ARCH=arm MEDIACENTER=glmark2 OPENGLES=mali-t76x-fbdev make image`
 * `PROJECT=TinkerBoard ARCH=arm MEDIACENTER=mpv-rockchip make image`
+* `PROJECT=TinkerBoard ARCH=arm MEDIACENTER=kodi make image`
+* `PROJECT=TinkerBoard ARCH=arm MEDIACENTER=kodi OPENGLES=mali-t76x-fbdev make image`

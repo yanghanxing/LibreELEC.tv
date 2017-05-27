@@ -21,7 +21,15 @@ mkdir -p $RELEASE_DIR/3rdparty/bootloader
   if [ -f $INSTALL/usr/share/bootloader/idbloader.img ]; then
     cp $INSTALL/usr/share/bootloader/idbloader.img $RELEASE_DIR/3rdparty/bootloader
   fi
+  if [ -f $INSTALL/usr/share/bootloader/uboot.img ]; then
+    cp $INSTALL/usr/share/bootloader/uboot.img $RELEASE_DIR/3rdparty/bootloader
+  fi
+  if [ -f $INSTALL/usr/share/bootloader/trust.img ]; then
+    cp $INSTALL/usr/share/bootloader/trust.img $RELEASE_DIR/3rdparty/bootloader
+  fi
 
   if [ "$UBOOT_SOC" = "rk3288" ]; then
     cp $INSTALL/usr/share/bootloader/rk3288-*.dtb $RELEASE_DIR/3rdparty/bootloader/rk3288-miniarm.dtb
+  elif [ "$UBOOT_SOC" = "rk3328" ]; then
+    cp $INSTALL/usr/share/bootloader/rk3328-*.dtb $RELEASE_DIR/3rdparty/bootloader/rk3328-box.dtb
   fi

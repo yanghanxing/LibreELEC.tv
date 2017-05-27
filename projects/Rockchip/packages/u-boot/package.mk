@@ -60,5 +60,40 @@ makeinstall_target() {
     cat u-boot-dtb.bin >> idbloader.img
 
     cp -PRv idbloader.img $INSTALL/usr/share/bootloader
+  elif [ "$UBOOT_SOC" = "rk3328" ]; then
+    $PKG_DIR/tools/loaderimage --pack --uboot u-boot-dtb.bin uboot.img
+
+    dd if=$PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_ddr_786MHz_v1.06.bin of=ddr.bin bs=4 skip=1
+    tools/mkimage \
+      -n $UBOOT_SOC \
+      -T rksd \
+      -d ddr.bin \
+      idbloader.img
+    cat $PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_miniloader_v2.43.bin >> idbloader.img
+
+    cat >trust.ini <<EOF
+[VERSION]
+MAJOR=1
+MINOR=2
+[BL30_OPTION]
+SEC=0
+[BL31_OPTION]
+SEC=1
+PATH=$PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_bl31_v1.10.bin
+ADDR=0x10000
+[BL32_OPTION]
+SEC=1
+PATH=$PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_bl32_v1.01.bin
+ADDR=0x08400000
+[BL33_OPTION]
+SEC=0
+[OUTPUT]
+PATH=trust.img
+EOF
+    $PKG_DIR/tools/trust_merger trust.ini
+
+    cp -PRv idbloader.img $INSTALL/usr/share/bootloader
+    cp -PRv uboot.img $INSTALL/usr/share/bootloader
+    cp -PRv trust.img $INSTALL/usr/share/bootloader
   fi
 }

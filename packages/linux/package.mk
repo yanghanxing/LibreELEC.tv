@@ -65,7 +65,7 @@ case "$LINUX" in
     PKG_PATCH_DIRS="rockchip-4.4"
     ;;
   rockchip-4.4-3328)
-    PKG_VERSION="0cc931b"
+    PKG_VERSION="df0eddb"
     PKG_URL="https://github.com/rockchip-linux/kernel/archive/$PKG_VERSION.tar.gz"
     PKG_SOURCE_DIR="kernel-$PKG_VERSION*"
     PKG_PATCH_DIRS="rockchip-4.4-3328"

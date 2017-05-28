@@ -1,0 +1,22 @@
+From f0fb3e9944b1ed60388f49b05d8f7ce527c90685 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Sun, 28 May 2017 09:08:50 +0200
+Subject: [PATCH 6/7] gpu/arm/mali400: default to performance gpu governor
+
+---
+ drivers/gpu/arm/mali400/mali/linux/mali_devfreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/arm/mali400/mali/linux/mali_devfreq.c b/drivers/gpu/arm/mali400/mali/linux/mali_devfreq.c
+index 0b0ba1481eed..3a684d340e85 100644
+--- a/drivers/gpu/arm/mali400/mali/linux/mali_devfreq.c
++++ b/drivers/gpu/arm/mali400/mali/linux/mali_devfreq.c
+@@ -236,7 +236,7 @@ int mali_devfreq_init(struct mali_device *mdev)
+ 		return -EFAULT;
+ 
+ 	mdev->devfreq = devfreq_add_device(mdev->dev, dp,
+-					   "simple_ondemand", NULL);
++					   "performance", NULL);
+ 	if (IS_ERR(mdev->devfreq)) {
+ 		mali_devfreq_term_freq_table(mdev);
+ 		return PTR_ERR(mdev->devfreq);

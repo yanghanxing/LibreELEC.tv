@@ -2,7 +2,8 @@
 
 SCRIPTPATH=$(dirname $0)
 PKG_NAME=kodi
-PKG_BASE=17.3-Krypton
+eval $(grep "^PKG_VERSION" $SCRIPTPATH/../../../packages/mediacenter/$PKG_NAME/package.mk)
+PKG_BASE=$PKG_VERSION
 
 if [ ! -d .git ]; then
   echo "ERROR: current path is not a git repository"

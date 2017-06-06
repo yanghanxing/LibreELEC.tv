@@ -2,7 +2,8 @@
 
 SCRIPTPATH=$(dirname $0)
 PKG_NAME=linux
-PKG_BASE=origin/release-4.4
+eval $(grep "^  rockchip-4.4)" $SCRIPTPATH/../../../packages/$PKG_NAME/package.mk -A1 | grep PKG_VERSION)
+PKG_BASE=$PKG_VERSION
 
 if [ ! -d .git ]; then
   echo "ERROR: current path is not a git repository"

@@ -1,7 +1,7 @@
-From 574466c137721c962db30cecca6586630c67f607 Mon Sep 17 00:00:00 2001
+From 3ca1befdff3f7a153b81f731aefac947e798c3c7 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 2 May 2017 18:57:19 +0200
-Subject: [PATCH 18/19] sound/soc/codecs/hdmi-codec: fix I2S audio in Kodi
+Subject: [PATCH 18/20] sound/soc/codecs/hdmi-codec: fix I2S audio in Kodi
 
 ---
  sound/soc/codecs/hdmi-codec.c | 1 -

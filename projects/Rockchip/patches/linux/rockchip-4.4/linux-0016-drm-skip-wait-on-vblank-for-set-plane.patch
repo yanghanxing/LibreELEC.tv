@@ -1,7 +1,7 @@
-From c55817638922191d1cdd4777a9c6cf0e68a29682 Mon Sep 17 00:00:00 2001
+From 218c8d97061d97376bf4599a5fe35b7f6bd903d6 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 2 May 2017 07:53:15 +0200
-Subject: [PATCH 16/19] drm: skip wait on vblank for set plane
+Subject: [PATCH 16/20] drm: skip wait on vblank for set plane
 
 ---
  drivers/gpu/drm/drm_atomic_helper.c        | 6 ++----
@@ -33,10 +33,10 @@ index 933d3cca67c9..3792ba1c93cc 100644
  	ret = __drm_atomic_helper_disable_plane(plane, plane_state);
  	if (ret != 0)
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index c261a166ca22..ac810fbe8298 100644
+index 15fe607f2bc1..600e04e6514c 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -243,6 +243,11 @@ rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_stat
+@@ -250,6 +250,11 @@ rockchip_atomic_wait_for_complete(struct drm_device *dev, struct drm_atomic_stat
  		if (!crtc->state->active)
  			continue;
  

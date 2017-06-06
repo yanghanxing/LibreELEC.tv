@@ -1,17 +1,17 @@
-From 0ddd7b335a52e702aaf6a9cc58b2e55aa239f0d0 Mon Sep 17 00:00:00 2001
+From 11ffeb6c9ec09b05265077f6519cfc0a2962077f Mon Sep 17 00:00:00 2001
 From: LongChair <LongChair@hotmail.com>
 Date: Sun, 26 Mar 2017 15:30:15 +0200
-Subject: [PATCH 06/19] video/rockchip: raise up vpu clock
+Subject: [PATCH 06/20] video/rockchip: raise up vpu clock
 
 ---
  drivers/video/rockchip/vcodec/vcodec_service.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/video/rockchip/vcodec/vcodec_service.c b/drivers/video/rockchip/vcodec/vcodec_service.c
-index 03ef51341d91..5d70a3eeae2d 100644
+index 13a0adc31958..30a764707ab4 100644
 --- a/drivers/video/rockchip/vcodec/vcodec_service.c
 +++ b/drivers/video/rockchip/vcodec/vcodec_service.c
-@@ -1208,8 +1208,7 @@ static void get_reg_freq(struct vpu_subdev_data *data, struct vpu_reg *reg)
+@@ -1221,8 +1221,7 @@ static void get_reg_freq(struct vpu_subdev_data *data, struct vpu_reg *reg)
  			}
  		}
  		if (data->hw_id == HEVC_ID) {

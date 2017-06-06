@@ -1,7 +1,7 @@
-From d1b4de0f8b3ddb4ee30323ff69d307bb5c341acd Mon Sep 17 00:00:00 2001
+From 5bb366b311b4477d88b1e0888427dbe4c73b2051 Mon Sep 17 00:00:00 2001
 From: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Date: Tue, 3 Jan 2017 16:52:52 +0100
-Subject: [PATCH 11/19] ASoC: hdmi-codec: add channel mapping control
+Subject: [PATCH 11/20] ASoC: hdmi-codec: add channel mapping control
 
 Add user interface to provide channel mapping.
 In a first step this control is read only.

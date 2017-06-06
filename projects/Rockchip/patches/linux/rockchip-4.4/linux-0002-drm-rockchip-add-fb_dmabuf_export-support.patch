@@ -1,7 +1,7 @@
-From fd3612750a7203fe54178f7a7cbf40c4bb1c055a Mon Sep 17 00:00:00 2001
+From 879b286eddfb03277c749182ab346166a5ee01c2 Mon Sep 17 00:00:00 2001
 From: Grzegorz Prajsner <grzegorz.prajsner@arm.com>
 Date: Wed, 24 Jun 2015 15:23:13 +0100
-Subject: [PATCH 02/19] drm/rockchip: add fb_dmabuf_export support
+Subject: [PATCH 02/20] drm/rockchip: add fb_dmabuf_export support
 
 Add support for fb_dmabuf_export call, which is executed when ioctl
 FBIOGET_DMABUF is called.

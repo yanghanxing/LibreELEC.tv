@@ -35,7 +35,7 @@
 
   # Kernel to use. values can be:
   # default:  default mainline kernel
-    LINUX="${LINUX:-rockchip-4.4-3328}"
+    LINUX="${LINUX:-rockchip-4.4}"
 
   # Fix linux rockchip-4.4 compile
     if [ "$1" = "linux" ] && [ "$LINUX" = "rockchip-4.4-3328" -o "$LINUX" = "rockchip-4.4" ]; then

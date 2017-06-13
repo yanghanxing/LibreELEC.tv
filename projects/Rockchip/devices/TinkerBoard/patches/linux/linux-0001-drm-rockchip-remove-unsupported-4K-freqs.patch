@@ -1,4 +1,4 @@
-From 1b5df34d91ef926a0e4fe9cb4d0cf13d1e216e5c Mon Sep 17 00:00:00 2001
+From 60cf53799bc67765d415603bbad61abf9f833673 Mon Sep 17 00:00:00 2001
 From: LongChair <LongChair@hotmail.com>
 Date: Fri, 21 Apr 2017 13:39:12 +0200
 Subject: [PATCH] drm/rockchip: remove unsupported 4K freqs

@@ -1,7 +1,7 @@
-From 52791f28395d0923df0ee9f4a1870b45affa784e Mon Sep 17 00:00:00 2001
+From 98056599f17c5efb0da4cca5d3bec8c65e51710a Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Mon, 17 Apr 2017 13:09:16 +0200
-Subject: [PATCH 14/20] sound/usb/quirks-table: add Realtek ALC4040
+Subject: [PATCH 14/27] sound/usb/quirks-table: add Realtek ALC4040
 
 ---
  sound/usb/quirks-table.h | 9 +++++++++

@@ -1,19 +1,19 @@
-From eaa523aceb64c82aa2ac36b74e59fa0ec0e94bc1 Mon Sep 17 00:00:00 2001
+From bbc5272101c799481095cc4e7f2abcf4235a61fa Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
-Date: Tue, 13 Jun 2017 08:02:56 +0200
-Subject: [PATCH 21/27] rk3328-rock64: work-in-progress
+Date: Thu, 15 Jun 2017 21:00:59 +0200
+Subject: [PATCH 21/29] rk3328-rock64: work-in-progress
 
 ---
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 492 +++++++++++++++++++++++++
- 1 file changed, 492 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 494 +++++++++++++++++++++++++
+ 1 file changed, 494 insertions(+)
  create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
 new file mode 100644
-index 000000000000..39a8e8efda4d
+index 000000000000..c62db85e799d
 --- /dev/null
 +++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,494 @@
 +/*
 + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
 + *
@@ -60,7 +60,7 @@ index 000000000000..39a8e8efda4d
 +#include "rk3328.dtsi"
 +
 +/ {
-+	model = "Pine64 Rock64";
++	model = "PINE64 ROCK64";
 +	compatible = "pine64,rock64", "rockchip,rk3328";
 +
 +	chosen {
@@ -117,7 +117,7 @@ index 000000000000..39a8e8efda4d
 +		compatible = "simple-audio-card";
 +		simple-audio-card,format = "i2s";
 +		simple-audio-card,mclk-fs = <128>;
-+		simple-audio-card,name = "rockchip,hdmi";
++		simple-audio-card,name = "ROCK64";
 +		simple-audio-card,cpu {
 +			sound-dai = <&i2s0>;
 +		};
@@ -128,7 +128,7 @@ index 000000000000..39a8e8efda4d
 +
 +	spdif-sound {
 +		compatible = "simple-audio-card";
-+		simple-audio-card,name = "rockchip,spdif";
++		simple-audio-card,name = "SPDIF";
 +		simple-audio-card,cpu {
 +			sound-dai = <&spdif>;
 +		};
@@ -218,6 +218,8 @@ index 000000000000..39a8e8efda4d
 +
 +&hdmi {
 +	#sound-dai-cells = <0>;
++	ddc-i2c-scl-high-time-ns = <9625>;
++	ddc-i2c-scl-low-time-ns = <10000>;
 +	status = "okay";
 +};
 +

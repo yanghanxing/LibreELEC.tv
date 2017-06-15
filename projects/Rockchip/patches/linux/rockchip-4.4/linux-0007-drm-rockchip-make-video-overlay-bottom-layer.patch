@@ -1,7 +1,7 @@
-From 03c194cb3114cb2c338bac4dc904322bd267929f Mon Sep 17 00:00:00 2001
+From 7fef3b87df47886c07f6e842f03baae4de520b10 Mon Sep 17 00:00:00 2001
 From: LongChair <LongChair@hotmail.com>
 Date: Sun, 26 Mar 2017 15:30:16 +0200
-Subject: [PATCH 07/27] drm/rockchip: make video overlay bottom layer
+Subject: [PATCH 07/29] drm/rockchip: make video overlay bottom layer
 
 ---
  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 8 ++++----

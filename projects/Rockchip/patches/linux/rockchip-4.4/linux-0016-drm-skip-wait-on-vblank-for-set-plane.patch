@@ -1,7 +1,7 @@
-From d13672b32960009a3af24edeba18d6754197fd99 Mon Sep 17 00:00:00 2001
+From 6304be87f2dc783fe098375c7b2272cf3404f328 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 2 May 2017 07:53:15 +0200
-Subject: [PATCH 16/27] drm: skip wait on vblank for set plane
+Subject: [PATCH 16/29] drm: skip wait on vblank for set plane
 
 ---
  drivers/gpu/drm/drm_atomic_helper.c        | 6 ++----

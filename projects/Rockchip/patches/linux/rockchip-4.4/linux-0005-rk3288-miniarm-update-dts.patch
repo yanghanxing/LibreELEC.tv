@@ -1,7 +1,7 @@
-From 178609013d29c7f1784abdf13bcaff362bb163fa Mon Sep 17 00:00:00 2001
+From 946c7167b552f4154ca20351754d1755087a02a2 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 5 Mar 2017 17:30:26 +0100
-Subject: [PATCH 05/27] rk3288-miniarm: update dts
+Subject: [PATCH 05/29] rk3288-miniarm: update dts
 
 ---
  arch/arm/boot/dts/rk3288-miniarm.dts | 21 ++++++++++++++++-----

@@ -31,6 +31,11 @@ PKG_LONGDESC="Das U-Boot is a cross-platform bootloader for embedded systems, us
 PKG_IS_ADDON="no"
 PKG_AUTORECONF="no"
 
+if [ "$UBOOT_SOC" = "rk3328" ]; then
+  PKG_DEPENDS_TARGET="$PKG_DEPENDS_TARGET rkbin"
+  PKG_NEED_UNPACK="$(get_pkg_directory rkbin)"
+fi
+
 pre_configure_target() {
   if [ -z "$UBOOT_CONFIG" ]; then
     echo "Please add UBOOT_CONFIG to your project or device options file, aborting."
@@ -63,13 +68,13 @@ makeinstall_target() {
   elif [ "$UBOOT_SOC" = "rk3328" ]; then
     $PKG_DIR/tools/loaderimage --pack --uboot u-boot-dtb.bin uboot.img
 
-    dd if=$PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_ddr_786MHz_v1.06.bin of=ddr.bin bs=4 skip=1
+    dd if=$(get_build_dir rkbin)/rk33/rk3328_ddr_786MHz_v1.06.bin of=ddr.bin bs=4 skip=1
     tools/mkimage \
       -n $UBOOT_SOC \
       -T rksd \
       -d ddr.bin \
       idbloader.img
-    cat $PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_miniloader_v2.43.bin >> idbloader.img
+    cat $(get_build_dir rkbin)/rk33/rk3328_miniloader_v2.43.bin >> idbloader.img
 
     cat >trust.ini <<EOF
 [VERSION]
@@ -79,11 +84,11 @@ MINOR=2
 SEC=0
 [BL31_OPTION]
 SEC=1
-PATH=$PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_bl31_v1.10.bin
+PATH=$(get_build_dir rkbin)/rk33/rk3328_bl31_v1.10.bin
 ADDR=0x10000
 [BL32_OPTION]
 SEC=1
-PATH=$PROJECT_DIR/$PROJECT/devices/$DEVICE/bootloader/rk3328_bl32_v1.01.bin
+PATH=$(get_build_dir rkbin)/rk33/rk3328_bl32_v1.01.bin
 ADDR=0x08400000
 [BL33_OPTION]
 SEC=0

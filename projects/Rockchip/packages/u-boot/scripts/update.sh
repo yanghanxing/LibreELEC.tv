@@ -50,15 +50,15 @@ fi
 # update bootloader
   if [ -f "$SYSTEM_ROOT/usr/share/bootloader/idbloader.img" ]; then
     echo "*** updating idbloader.img on: $BOOT_DISK ..."
-    dd if=$SYSTEM_ROOT/usr/share/bootloader/idbloader.img of=$BOOT_DISK conv=fsync seek=64
+    dd if=$SYSTEM_ROOT/usr/share/bootloader/idbloader.img of=$BOOT_DISK conv=fsync bs=32k seek=1
   fi
   if [ -f "$SYSTEM_ROOT/usr/share/bootloader/uboot.img" ]; then
     echo "*** updating uboot.img on: $BOOT_DISK ..."
-    dd if=$SYSTEM_ROOT/usr/share/bootloader/uboot.img of=$BOOT_DISK conv=fsync seek=16384
+    dd if=$SYSTEM_ROOT/usr/share/bootloader/uboot.img of=$BOOT_DISK conv=fsync bs=64k seek=128
   fi
   if [ -f "$SYSTEM_ROOT/usr/share/bootloader/trust.img" ]; then
     echo "*** updating trust.img on: $BOOT_DISK ..."
-    dd if=$SYSTEM_ROOT/usr/share/bootloader/trust.img of=$BOOT_DISK conv=fsync seek=24576
+    dd if=$SYSTEM_ROOT/usr/share/bootloader/trust.img of=$BOOT_DISK conv=fsync bs=64k seek=192
   fi
 
 # mount $BOOT_ROOT r/o

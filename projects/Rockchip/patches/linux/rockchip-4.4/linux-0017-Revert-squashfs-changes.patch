@@ -1,7 +1,7 @@
 From 806fd6eac4921b2a8bff78da1d0d3f9d67078d82 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Thu, 25 May 2017 14:30:22 +0200
-Subject: [PATCH 17/29] Revert squashfs changes
+Subject: [PATCH 17/27] Revert squashfs changes
 
 Revert "Squashfs: optimize reading uncompressed data"
 

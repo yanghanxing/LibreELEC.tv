@@ -1,0 +1,97 @@
+From 4c3b810fba8c8cd1090e5fe3059fd94eb298f369 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Fri, 16 Jun 2017 21:15:50 +0200
+Subject: [PATCH 27/27] gpu/drm/rockchip: hdmi fix from rockchip
+
+---
+ drivers/gpu/drm/bridge/dw-hdmi.c            | 10 ++++++----
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 31 +++++++++++++++++------------
+ 2 files changed, 24 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+index f0a1d41e4716..85bbeae5f788 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+@@ -1663,9 +1663,9 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+ 		HDMI_FC_INVIDCONF_IN_I_P_INTERLACED :
+ 		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE;
+ 
+-	inv_val |= hdmi->sink_is_hdmi ?
+-		HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE :
+-		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE;
++//	inv_val |= hdmi->sink_is_hdmi ?
++//		HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE :
++//		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE;
+ 
+ 	hdmi_writeb(hdmi, inv_val, HDMI_FC_INVIDCONF);
+ 
+@@ -1925,7 +1925,9 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
+ 	/* not for DVI mode */
+ 	if (hdmi->sink_is_hdmi) {
+ 		dev_dbg(hdmi->dev, "%s HDMI mode\n", __func__);
+-
++		hdmi_modb(hdmi, HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE,
++			  HDMI_FC_INVIDCONF_DVI_MODEZ_HDMI_MODE,
++			  HDMI_FC_INVIDCONF);
+ 		/* HDMI Initialization Step F - Configure AVI InfoFrame */
+ 		hdmi_config_AVI(hdmi, mode);
+ 		hdmi_config_vendor_specific_infoframe(hdmi, mode);
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 8c67659da743..8d48d70c50ed 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -254,7 +254,7 @@ inno_dw_hdmi_phy_init(struct dw_hdmi *dw_hdmi, void *data,
+ 		return -EINVAL;
+ 
+ 	/* set pdata_en to 0 */
+-	inno_phy_modeb(hdmi, 0, 1, 0x01);
++	inno_phy_modeb(hdmi, 0, 1, 0x02);
+ 	/* Power off post PLL */
+ 	inno_phy_modeb(hdmi, 1, 1, 0xaa);
+ 
+@@ -273,14 +273,6 @@ inno_dw_hdmi_phy_init(struct dw_hdmi *dw_hdmi, void *data,
+ 		inno_phy_writel(hdmi, 0xab, val);
+ 		inno_phy_writel(hdmi, 0xaa, 0x0e);
+ 	}
+-	/* Power up post PLL */
+-	inno_phy_modeb(hdmi, 0, 1, 0xaa);
+-	/* Wait for post PLL lock */
+-	for (i = 0; i < 5; ++i) {
+-		if (inno_phy_readl(hdmi, 0xaf) & 1)
+-			break;
+-		usleep_range(1000, 2000);
+-	}
+ 
+ 	for (i = 0; i < 14; i++)
+ 		inno_phy_writel(hdmi, 0xb5 + i, inno_phy_config->regs[i]);
+@@ -317,13 +309,26 @@ inno_dw_hdmi_phy_init(struct dw_hdmi *dw_hdmi, void *data,
+ 		inno_phy_writel(hdmi, 0xc5, 0x81);
+ 	}
+ 
+-	if (inno_phy_config->tmdsclock > 340000000)
+-		msleep(100);
+-
++	/* Power up post PLL */
++	inno_phy_modeb(hdmi, 0, 1, 0xaa);
++	/* Power up tmds driver */
+ 	inno_phy_modeb(hdmi, 4, 4, 0xb0);
+ 	inno_phy_writel(hdmi, 0xb2, 0x0f);
++
++	/* Wait for post PLL lock */
++	for (i = 0; i < 5; ++i) {
++		if (inno_phy_readl(hdmi, 0xaf) & 1)
++			break;
++		usleep_range(1000, 2000);
++	}
++	if (!(inno_phy_readl(hdmi, 0xaf) & 1)) {
++		dev_err(hdmi->dev, "HDMI PHY Post PLL unlock\n");
++		return -ETIMEDOUT;
++	}
++	if (inno_phy_config->tmdsclock > 340000000)
++		msleep(100);
+ 	/* set pdata_en to 1 */
+-	inno_phy_modeb(hdmi, 1, 1, 0x01);
++	inno_phy_modeb(hdmi, 1, 1, 0x02);
+ 	return 0;
+ }
+ 

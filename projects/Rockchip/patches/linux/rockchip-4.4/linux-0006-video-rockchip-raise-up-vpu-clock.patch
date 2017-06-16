@@ -1,7 +1,7 @@
 From 0a2bc75e269512a1b7db48148e2c1e3113f6e067 Mon Sep 17 00:00:00 2001
 From: LongChair <LongChair@hotmail.com>
 Date: Sun, 26 Mar 2017 15:30:15 +0200
-Subject: [PATCH 06/29] video/rockchip: raise up vpu clock
+Subject: [PATCH 06/27] video/rockchip: raise up vpu clock
 
 ---
  drivers/video/rockchip/vcodec/vcodec_service.c | 3 +--

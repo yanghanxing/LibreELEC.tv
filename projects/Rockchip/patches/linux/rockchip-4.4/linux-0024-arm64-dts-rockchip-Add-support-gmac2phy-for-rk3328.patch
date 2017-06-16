@@ -1,0 +1,76 @@
+From a8c2c62ff9b05e5b0b01fc462a7aa065969cc9b5 Mon Sep 17 00:00:00 2001
+From: David Wu <david.wu@rock-chips.com>
+Date: Fri, 16 Jun 2017 20:55:42 +0800
+Subject: [PATCH 24/27] arm64: dts: rockchip: Add support gmac2phy for rk3328
+
+Change-Id: If2c0e5b6d50ba4326f6ca7d2ee4a1c87e7682959
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 10 ++++++++++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi    | 25 +++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+index 982dea5c39b6..0baca6c9e6df 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+@@ -195,6 +195,16 @@
+ 	status = "disabled";
+ };
+ 
++&gmac2phy {
++	phy-supply = <&vcc_phy>;
++	clock_in_out = "output";
++	assigned-clocks = <&cru SCLK_MAC2PHY_SRC>;
++	assigned-clock-rate = <50000000>;
++	assigned-clocks = <&cru SCLK_MAC2PHY>;
++	assigned-clock-parents = <&cru SCLK_MAC2PHY_SRC>;
++	status = "okay";
++};
++
+ &gpu {
+ 	status = "okay";
+ 	mali-supply = <&vdd_logic>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index e5593b6be301..d1c202c67239 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -64,6 +64,8 @@
+ 		i2c1 = &i2c1;
+ 		i2c2 = &i2c2;
+ 		i2c3 = &i2c3;
++		ethernet0 = &gmac2io;
++		ethernet1 = &gmac2phy;
+ 	};
+ 
+ 	cpus {
+@@ -1024,6 +1026,29 @@
+ 		status = "disabled";
+ 	};
+ 
++	gmac2phy: eth@ff550000 {
++		compatible = "rockchip,rk3328-gmac";
++		reg = <0x0 0xff550000 0x0 0x10000>;
++		rockchip,grf = <&grf>;
++		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "macirq";
++		clocks = <&cru SCLK_MAC2PHY_SRC>, <&cru SCLK_MAC2PHY_RXTX>,
++			 <&cru SCLK_MAC2PHY_RXTX>, <&cru SCLK_MAC2PHY_REF>,
++			 <&cru ACLK_MAC2PHY>, <&cru PCLK_MAC2PHY>,
++			 <&cru SCLK_MAC2PHY_OUT>;
++		clock-names = "stmmaceth", "mac_clk_rx",
++			      "mac_clk_tx", "clk_mac_ref",
++			      "aclk_mac", "pclk_mac",
++			      "clk_macphy";
++		resets = <&cru SRST_GMAC2PHY_A>, <&cru SRST_MACPHY>;
++		reset-names = "stmmaceth", "mac-phy";
++		phy-mode = "rmii";
++		phy-type = "internal";
++		pinctrl-names = "default";
++		pinctrl-0 = <&fephyled_rxm1 &fephyled_linkm1>;
++		status = "disabled";
++	};
++
+ 	usb20_otg: usb@ff580000 {
+ 		compatible = "rockchip,rk3328-usb", "rockchip,rk3066-usb",
+ 			     "snps,dwc2";

@@ -1,0 +1,144 @@
+From f5c9fc5a2047de92f98d6ac05030b132587d34a2 Mon Sep 17 00:00:00 2001
+From: David Wu <david.wu@rock-chips.com>
+Date: Fri, 16 Jun 2017 20:53:12 +0800
+Subject: [PATCH 22/27] net: phy: Add rockchip phy support
+
+Support internal ephy currently.
+
+Change-Id: I8d85e7f98d152dc74ac2036de384625d0d228f2b
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ drivers/net/phy/Kconfig    |  5 +++
+ drivers/net/phy/Makefile   |  1 +
+ drivers/net/phy/rockchip.c | 97 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+)
+ create mode 100644 drivers/net/phy/rockchip.c
+
+diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+index 60994a83a0d6..5d5ee4d3f6a2 100644
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -256,6 +256,11 @@ config MDIO_BCM_IPROC
+ 	  This module provides a driver for the MDIO busses found in the
+ 	  Broadcom iProc SoC's.
+ 
++config ROCKCHIP_PHY
++	tristate "Drivers for ROCKCHIP PHY"
++	---help---
++	  Currently supports the internal ephy
++
+ endif # PHYLIB
+ 
+ config MICREL_KS8995MA
+diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
+index f31a4e25cf15..4e0fdd66d8fd 100644
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -42,3 +42,4 @@ obj-$(CONFIG_MDIO_MOXART)	+= mdio-moxart.o
+ obj-$(CONFIG_MDIO_BCM_UNIMAC)	+= mdio-bcm-unimac.o
+ obj-$(CONFIG_MICROCHIP_PHY)	+= microchip.o
+ obj-$(CONFIG_MDIO_BCM_IPROC)	+= mdio-bcm-iproc.o
++obj-$(CONFIG_ROCKCHIP_PHY)	+= rockchip.o
+diff --git a/drivers/net/phy/rockchip.c b/drivers/net/phy/rockchip.c
+new file mode 100644
+index 000000000000..4c1d0909794b
+--- /dev/null
++++ b/drivers/net/phy/rockchip.c
+@@ -0,0 +1,97 @@
++/**
++ * rockchip.c  - Rockchip RK3228 & RK3328 internal ephy specific glue layer
++ *
++ * Copyright (C) 2017
++ *
++ * David Wu<david.wu@rock-chips.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mii.h>
++#include <linux/ethtool.h>
++#include <linux/phy.h>
++#include <linux/netdevice.h>
++
++static int internal_config_init(struct phy_device *phydev)
++{
++	int val;
++	u32 features;
++
++	/*enable auto mdix*/
++	phy_write(phydev, 0x11, 0x0080);
++
++	features = (SUPPORTED_TP | SUPPORTED_MII
++			| SUPPORTED_AUI | SUPPORTED_FIBRE |
++			SUPPORTED_BNC);
++
++	/* Do we support autonegotiation? */
++	val = phy_read(phydev, MII_BMSR);
++	if (val < 0)
++		return val;
++
++	if (val & BMSR_ANEGCAPABLE)
++		features |= SUPPORTED_Autoneg;
++
++	if (val & BMSR_100FULL)
++		features |= SUPPORTED_100baseT_Full;
++	if (val & BMSR_100HALF)
++		features |= SUPPORTED_100baseT_Half;
++	if (val & BMSR_10FULL)
++		features |= SUPPORTED_10baseT_Full;
++	if (val & BMSR_10HALF)
++		features |= SUPPORTED_10baseT_Half;
++
++	if (val & BMSR_ESTATEN) {
++		val = phy_read(phydev, MII_ESTATUS);
++		if (val < 0)
++			return val;
++
++		if (val & ESTATUS_1000_TFULL)
++			features |= SUPPORTED_1000baseT_Full;
++		if (val & ESTATUS_1000_THALF)
++			features |= SUPPORTED_1000baseT_Half;
++	}
++
++	phydev->supported = features;
++	phydev->advertising = features;
++
++	return 0;
++}
++
++static struct phy_driver rockchip_phy_driver[] = {
++{
++	.phy_id 		= 0x1234d400,
++	.phy_id_mask	= 0xffffffff,
++	.name		= "rockchip internal ephy",
++	.features		= 0,
++	.soft_reset 	= genphy_soft_reset,
++	.config_init	= internal_config_init,
++	.config_aneg	= genphy_config_aneg,
++	.aneg_done	= genphy_aneg_done,
++	.read_status	= genphy_read_status,
++	.suspend		= genphy_suspend,
++	.resume 		= genphy_resume,
++	.driver		= { .owner = THIS_MODULE, },
++},
++};
++
++module_phy_driver(rockchip_phy_driver);
++
++static struct mdio_device_id __maybe_unused rockchip_phy_tbl[] = {
++	{ 0x1234d400, 0xffffffff },
++	{ }
++};
++
++MODULE_DEVICE_TABLE(mdio, rockchip_phy_tbl);

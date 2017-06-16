@@ -66,7 +66,7 @@ makeinstall_target() {
 
     cp -PRv idbloader.img $INSTALL/usr/share/bootloader
   elif [ "$UBOOT_SOC" = "rk3328" ]; then
-    $PKG_DIR/tools/loaderimage --pack --uboot u-boot-dtb.bin uboot.img
+    $(get_build_dir rkbin)/tools/loaderimage --pack --uboot u-boot-dtb.bin uboot.img
 
     dd if=$(get_build_dir rkbin)/rk33/rk3328_ddr_786MHz_v1.06.bin of=ddr.bin bs=4 skip=1
     tools/mkimage \
@@ -95,7 +95,7 @@ SEC=0
 [OUTPUT]
 PATH=trust.img
 EOF
-    $PKG_DIR/tools/trust_merger trust.ini
+    $(get_build_dir rkbin)/tools/trust_merger trust.ini
 
     cp -PRv idbloader.img $INSTALL/usr/share/bootloader
     cp -PRv uboot.img $INSTALL/usr/share/bootloader

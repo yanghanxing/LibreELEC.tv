@@ -1,4 +1,4 @@
-From aa774157006480fe2989df621a73761d9cfa24de Mon Sep 17 00:00:00 2001
+From b4b8dc132e3c50a99f6d5a932206b9971fb6d128 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 5 Mar 2017 17:25:47 +0100
 Subject: [PATCH 2/2] rk3288-tinker: update dts
@@ -65,7 +65,7 @@ index a752458663..e2af041aef 100644
  				regulator-state-mem {
  					regulator-off-in-suspend;
 diff --git a/arch/arm/dts/rk3288.dtsi b/arch/arm/dts/rk3288.dtsi
-index 64aa07de36..a8fc213e8b 100644
+index da518783e2..1aa71edbaf 100644
 --- a/arch/arm/dts/rk3288.dtsi
 +++ b/arch/arm/dts/rk3288.dtsi
 @@ -629,7 +629,7 @@

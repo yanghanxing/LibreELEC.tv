@@ -26,7 +26,7 @@ This is an experimental project for the ASUS Tinker Board
     * [x] scale video correctly
     * [x] fix memory leak
 * [x] WiFi
-* [ ] Bluetooth
+* [x] Bluetooth
 * [ ] ~~CEC~~
 
 **Known Issues/Limitations**

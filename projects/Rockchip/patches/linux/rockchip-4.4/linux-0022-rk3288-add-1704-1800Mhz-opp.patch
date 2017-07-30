@@ -1,0 +1,30 @@
+From 8d72d89a37f547a751f65c18be974167c1ef25f0 Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Sun, 18 Jun 2017 17:00:36 +0200
+Subject: [PATCH 22/22] rk3288: add 1704/1800Mhz opp
+
+---
+ arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 6d72dce35b7a..49ce298ab7d4 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -190,6 +190,16 @@
+ 			opp-microvolt = <1350000>;
+ 			clock-latency-ns = <40000>;
+ 		};
++		opp-1704000000 {
++			opp-hz = /bits/ 64 <1704000000>;
++			opp-microvolt = <1350000>;
++			clock-latency-ns = <40000>;
++		};
++		opp-1800000000 {
++			opp-hz = /bits/ 64 <1800000000>;
++			opp-microvolt = <1400000>;
++			clock-latency-ns = <40000>;
++		};
+ 	};
+ 
+ 	amba {

@@ -1,0 +1,38 @@
+From 8c9fb79e675064d8d515344dcd8650db214e5ef1 Mon Sep 17 00:00:00 2001
+From: Daniel Rosenberg <drosen@google.com>
+Date: Mon, 26 Jun 2017 18:21:56 -0700
+Subject: [PATCH 02/22] ANDROID: squashfs: Fix endianness issue
+
+Code in squashfs_process_blocks was not correctly assigning
+length. Casting to u16* introduced endianness issues on some
+architectures.
+
+Signed-off-by: Daniel Rosenberg <drosen@google.com>
+Bug: 35257858
+Change-Id: I9efaef4bc531b7469de79cf94738ade2dd6e6a8c
+---
+ fs/squashfs/block.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/fs/squashfs/block.c b/fs/squashfs/block.c
+index 4e3e0863f5ea..b3b95e2ae2ff 100644
+--- a/fs/squashfs/block.c
++++ b/fs/squashfs/block.c
+@@ -121,11 +121,12 @@ static void squashfs_process_blocks(struct squashfs_read_request *req)
+ 
+ 	if (req->data_processing == SQUASHFS_METADATA) {
+ 		/* Extract the length of the metadata block */
+-		if (req->offset != msblk->devblksize - 1)
+-			length = *((u16 *)(bh[0]->b_data + req->offset));
+-		else {
+-			length = bh[0]->b_data[req->offset];
+-			length |= bh[1]->b_data[0] << 8;
++		if (req->offset != msblk->devblksize - 1) {
++			length = le16_to_cpup((__le16 *)
++					(bh[0]->b_data + req->offset));
++		} else {
++			length = (unsigned char)bh[0]->b_data[req->offset];
++			length |= (unsigned char)bh[1]->b_data[0] << 8;
+ 		}
+ 		req->compressed = SQUASHFS_COMPRESSED(length);
+ 		req->data_processing = req->compressed ? SQUASHFS_DECOMPRESS

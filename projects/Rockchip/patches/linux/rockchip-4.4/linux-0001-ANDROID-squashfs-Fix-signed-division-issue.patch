@@ -1,0 +1,31 @@
+From c4ecc375016eb93ed4caf87a83ddb487e68699cf Mon Sep 17 00:00:00 2001
+From: Daniel Rosenberg <drosen@google.com>
+Date: Tue, 20 Jun 2017 17:05:33 -0700
+Subject: [PATCH 01/22] ANDROID: squashfs: Fix signed division issue
+
+The value here can change depending on the type that PAGE_SIZE
+has on a given architecture. To avoid the ensuing signed and
+unsigned division conversions, we shift instead using PAGE_SHIFT
+
+Signed-off-by: Daniel Rosenberg <drosen@google.com>
+Bug: 35257858
+Change-Id: I132cae93abea39390c3f0f91a4b2e026e97ed4c7
+---
+ fs/squashfs/block.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fs/squashfs/block.c b/fs/squashfs/block.c
+index 2eb66decc5ab..4e3e0863f5ea 100644
+--- a/fs/squashfs/block.c
++++ b/fs/squashfs/block.c
+@@ -211,8 +211,8 @@ static int bh_is_optional(struct squashfs_read_request *req, int idx)
+ 	int start_idx, end_idx;
+ 	struct squashfs_sb_info *msblk = req->sb->s_fs_info;
+ 
+-	start_idx = (idx * msblk->devblksize - req->offset) / PAGE_CACHE_SIZE;
+-	end_idx = ((idx + 1) * msblk->devblksize - req->offset + 1) / PAGE_CACHE_SIZE;
++	start_idx = (idx * msblk->devblksize - req->offset) >> PAGE_SHIFT;
++	end_idx = ((idx + 1) * msblk->devblksize - req->offset + 1) >> PAGE_SHIFT;
+ 	if (start_idx >= req->output->pages)
+ 		return 1;
+ 	if (start_idx < 0)

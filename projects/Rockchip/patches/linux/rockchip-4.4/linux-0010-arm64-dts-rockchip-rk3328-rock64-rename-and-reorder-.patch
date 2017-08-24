@@ -1,4 +1,4 @@
-From 047d9d92b7d436398441f69ea61d40fad200cc58 Mon Sep 17 00:00:00 2001
+From 1552d0757925c909a2c0ab27d17d466087277949 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:36 +0200
 Subject: [PATCH 10/33] arm64: dts: rockchip: rk3328-rock64: rename and reorder

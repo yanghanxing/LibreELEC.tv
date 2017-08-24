@@ -1,4 +1,4 @@
-From 5cb380ee3b46e504ecfcdcef41d81d82340f3484 Mon Sep 17 00:00:00 2001
+From 42125bcb2fad54a9091cec94ef17addfb653f5c0 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Mon, 17 Apr 2017 13:09:16 +0200
 Subject: [PATCH 21/33] drm: dw-hdmi-i2s: configure channel allocation

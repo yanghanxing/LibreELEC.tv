@@ -1,7 +1,7 @@
-From 4610c938992174d852339b6801f472cacb24ce7a Mon Sep 17 00:00:00 2001
+From c22946b5e2929a35529f57267a74a42055aedf94 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Mon, 14 Aug 2017 00:14:05 +0200
-Subject: [PATCH 24/33] ASoC: hdmi-codec: reorder channel map
+Subject: [PATCH 23/33] ASoC: hdmi-codec: reorder channel map
 
 ---
  sound/soc/codecs/hdmi-codec.c | 113 +++++++++++++++++++-----------------------

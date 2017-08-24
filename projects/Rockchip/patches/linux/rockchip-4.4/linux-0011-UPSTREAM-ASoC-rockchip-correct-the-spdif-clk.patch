@@ -1,4 +1,4 @@
-From 0b663cea19cf51396581406bce209878df021f30 Mon Sep 17 00:00:00 2001
+From 033452b4577d730444f153b457f6b2cf1c12a053 Mon Sep 17 00:00:00 2001
 From: Chris Zhong <zyw@rock-chips.com>
 Date: Mon, 18 Jul 2016 22:34:34 +0800
 Subject: [PATCH 11/33] UPSTREAM: ASoC: rockchip: correct the spdif clk

@@ -1,4 +1,4 @@
-From 696035cc556766b7955d2fa30fb7aaf101f1891f Mon Sep 17 00:00:00 2001
+From 853895c26ed4a09c7938b828cbc5b1e5eefe7455 Mon Sep 17 00:00:00 2001
 From: Romain Perier <romain.perier@collabora.com>
 Date: Thu, 20 Apr 2017 14:34:34 +0530
 Subject: [PATCH 18/33] UPSTREAM: drm: dw-hdmi: gate audio clock from the I2S

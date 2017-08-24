@@ -1,4 +1,4 @@
-From db6090aea6fd1c5a88a6951fb0f482c937960819 Mon Sep 17 00:00:00 2001
+From 12daa2472f6468838e8ad2865206a2352074a72f Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Fri, 16 Jun 2017 23:14:54 +0200
 Subject: [PATCH 01/15] Revert "dmaengine: pl330: _loop_cyclic supports
@@ -74,7 +74,7 @@ index 781f9f1c8982..73e0a3f515a2 100644
  						pxs, thrd->ev);
  	}
 
-From eb350e1be4eb42c0adb0dca194e178ec7a27c85c Mon Sep 17 00:00:00 2001
+From 7a3269fd70087ccb2b35c7566639d4ed07187ea8 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Fri, 16 Jun 2017 23:14:54 +0200
 Subject: [PATCH 02/15] Revert "dmaengine: pl330: redefine the cyclic transfer"
@@ -289,7 +289,7 @@ index 73e0a3f515a2..74ffe19a3283 100644
  	fill_px(&desc->px, dst, src, period_len);
  
 
-From 5f157945ebd9c5d868ee6f9dcb1bf05d766fed07 Mon Sep 17 00:00:00 2001
+From c3b319853784f9780a1340b1ce46c40b7d4ae030 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Fri, 16 Jun 2017 23:14:54 +0200
 Subject: [PATCH 03/15] Revert "dmaengine: pl330: make transfer run infinitely
@@ -632,7 +632,7 @@ index 74ffe19a3283..b49dd585cfd7 100644
  
  	return &desc->txd;
 
-From e7c7681286ab4b59a78f72b7932858aa11b41abf Mon Sep 17 00:00:00 2001
+From 83ab49e1b9cfdc40dc424a31c0ad484d93c6a3b7 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Fri, 16 Jun 2017 23:14:55 +0200
 Subject: [PATCH 04/15] Revert "dmaengine: pl330: support transfer that doesn't
@@ -692,7 +692,7 @@ index b49dd585cfd7..75d80e71e3b5 100644
  	off += _setup_xfer(pl330, dry_run, &buf[off], pxs);
  
 
-From 05362c86a21c5d93cfe48348ccc19353044dc193 Mon Sep 17 00:00:00 2001
+From d6af9484e0e65ad447944625c449b6e5e3bb3d5e Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Fri, 16 Jun 2017 23:14:55 +0200
 Subject: [PATCH 05/15] Revert "dmaengine: pl330: add burst mode according to
@@ -793,7 +793,7 @@ index 75d80e71e3b5..cbab161ff283 100644
  	for (i = 0; i < ARRAY_SIZE(of_quirks); i++)
  		if (of_property_read_bool(np, of_quirks[i].quirk))
 
-From 6cc15602cb2d8d99837a5a661bea1c23f82cbf96 Mon Sep 17 00:00:00 2001
+From d6d05334a63b10cc019d406d3e01e4fea836bdcb Mon Sep 17 00:00:00 2001
 From: Vinod Koul <vinod.koul@intel.com>
 Date: Tue, 5 Jul 2016 10:02:16 +0530
 Subject: [PATCH 06/15] UPSTREAM: dmaengine: pl330: explicitly freeup irq
@@ -836,7 +836,7 @@ index cbab161ff283..dd34f384689b 100644
  
  	/* Idle the DMAC */
 
-From 25644d6acd9b0700110cf97fcc971e531fee14dc Mon Sep 17 00:00:00 2001
+From fecf125419eab21dcb4e114b18749a57d2db3b7d Mon Sep 17 00:00:00 2001
 From: Stephen Barber <smbarber@chromium.org>
 Date: Thu, 18 Aug 2016 17:59:59 -0700
 Subject: [PATCH 07/15] UPSTREAM: dmaengine: pl330: fix residual for
@@ -896,7 +896,7 @@ index dd34f384689b..a39e9cd44b02 100644
  			transferred = 0;
  		residual += desc->bytes_requested - transferred;
 
-From 5d1943ca7e933c0e031c02514406ea70037e0779 Mon Sep 17 00:00:00 2001
+From 2f33618fc63f7ac262c8366e83067c5f819b7b00 Mon Sep 17 00:00:00 2001
 From: Hsin-Yu Chao <hychao@chromium.org>
 Date: Tue, 23 Aug 2016 17:16:55 +0800
 Subject: [PATCH 08/15] UPSTREAM: dmaengine: pl330: Acquire dmac's spinlock in
@@ -941,7 +941,7 @@ index a39e9cd44b02..ac202c912b88 100644
  
  out:
 
-From 3d667d6a685d276517f3fba80332a79be2fa1d3d Mon Sep 17 00:00:00 2001
+From 25d46517180a4910285eefc931c685a6fde039a3 Mon Sep 17 00:00:00 2001
 From: Stephen Barber <smbarber@chromium.org>
 Date: Tue, 1 Nov 2016 16:44:27 -0700
 Subject: [PATCH 09/15] UPSTREAM: dmaengine: pl330: Handle xferred count if
@@ -976,7 +976,7 @@ index ac202c912b88..e7bf325b3071 100644
  }
  
 
-From 851a4cdfc492161825b442370ffc3d2a779f844d Mon Sep 17 00:00:00 2001
+From 525add032b4ddd8cdf89a2ecc2e763973a8b4069 Mon Sep 17 00:00:00 2001
 From: Vladimir Murzin <vladimir.murzin@arm.com>
 Date: Wed, 7 Dec 2016 13:17:40 +0000
 Subject: [PATCH 10/15] UPSTREAM: dmaengine: pl330: do not generate unaligned
@@ -1079,7 +1079,7 @@ index e7bf325b3071..b45d6230cceb 100644
  	return SZ_DMAGO;
  }
 
-From f0e9f22999a30d73c3edf81a5858209c32c3fda9 Mon Sep 17 00:00:00 2001
+From 9be28fb583f9f3acf61424fd9abbf0f7541ba4c6 Mon Sep 17 00:00:00 2001
 From: Vinod Koul <vinod.koul@intel.com>
 Date: Fri, 9 Dec 2016 15:24:12 +0530
 Subject: [PATCH 11/15] =?UTF-8?q?UPSTREAM:=20dmaengine:=20pl330:=20remove?=
@@ -1120,7 +1120,7 @@ index b45d6230cceb..b241593856df 100644
  	if ((pl330->pcfg.periph_id & 0xfffff) != PERIPH_ID_VAL) {
  		dev_err(pl330->ddma.dev, "PERIPH_ID 0x%x !\n",
 
-From 5180f44f519e944b476c2d2ef9c1527bd6f56331 Mon Sep 17 00:00:00 2001
+From da812ad7274b5460d7a0f38735d37934bcabc69d Mon Sep 17 00:00:00 2001
 From: Iago Abal <mail@iagoabal.eu>
 Date: Wed, 11 Jan 2017 14:00:21 +0100
 Subject: [PATCH 12/15] UPSTREAM: dmaengine: pl330: fix double lock
@@ -1262,7 +1262,7 @@ index b241593856df..c725ceb4644d 100644
  	pm_runtime_put_autosuspend(pch->dmac->ddma.dev);
  }
 
-From 86af23154294f06096615538d4edf6283835b291 Mon Sep 17 00:00:00 2001
+From 56a7d3efaf43a43d0280b12ba7af974118f7d37a Mon Sep 17 00:00:00 2001
 From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 Date: Thu, 1 Jun 2017 19:22:01 +0100
 Subject: [PATCH 13/15] UPSTREAM: dmaengine: pl330: fix warning in pl330_remove
@@ -1294,7 +1294,7 @@ index c725ceb4644d..73eaf78871f1 100644
  
  	dma_async_device_unregister(&pl330->ddma);
 
-From 411ed64929bd0930e58a4ab04684c737f8b687ce Mon Sep 17 00:00:00 2001
+From 5bab0b74620585a51767d02f04936b448ec8ed59 Mon Sep 17 00:00:00 2001
 From: Marek Szyprowski <m.szyprowski@samsung.com>
 Date: Mon, 27 Mar 2017 07:31:03 +0200
 Subject: [PATCH 14/15] UPSTREAM: dmaengine: pl330: remove pdata based
@@ -1474,7 +1474,7 @@ index fe93758e8403..000000000000
 -extern bool pl330_filter(struct dma_chan *chan, void *param);
 -#endif	/* __AMBA_PL330_H_ */
 
-From ceaff03655cb2baea5d63d1a152484c266550e40 Mon Sep 17 00:00:00 2001
+From 27370cfcaf0d46726b62c5bc5e64bab4196f2531 Mon Sep 17 00:00:00 2001
 From: Matthias Kaehlcke <mka@chromium.org>
 Date: Thu, 15 Jun 2017 16:55:57 -0700
 Subject: [PATCH 15/15] UPSTREAM: dmaengine: pl330: Delete unused functions

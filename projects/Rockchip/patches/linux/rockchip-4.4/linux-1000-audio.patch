@@ -1,4 +1,4 @@
-From ff9d9ee2149ba663f31bbcc660cf2d4d1516feeb Mon Sep 17 00:00:00 2001
+From 5101b79e595cf2370b7bac0df105ed387b4f4db4 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Mon, 14 Aug 2017 00:14:05 +0200
 Subject: [PATCH] drm: dw-hdmi: change audio config

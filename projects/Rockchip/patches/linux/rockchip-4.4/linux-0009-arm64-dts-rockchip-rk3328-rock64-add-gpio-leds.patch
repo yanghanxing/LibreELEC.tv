@@ -1,4 +1,4 @@
-From f176693d732ed07c4c164ee993679d0dc3788d39 Mon Sep 17 00:00:00 2001
+From 20df8a5262c03b008d619a9d0ab2aaa5e42091d8 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:33 +0200
 Subject: [PATCH 09/33] arm64: dts: rockchip: rk3328-rock64: add gpio-leds

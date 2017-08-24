@@ -1,4 +1,4 @@
-From f56a8345dd33a0928c802ecc4f886e9e529e1b3a Mon Sep 17 00:00:00 2001
+From 686f397c15bee48e4149e4c1496eba14ff1c9c8e Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:31 +0200
 Subject: [PATCH 07/33] arm64: dts: rockchip: rk3328-rock64: sync with mainline

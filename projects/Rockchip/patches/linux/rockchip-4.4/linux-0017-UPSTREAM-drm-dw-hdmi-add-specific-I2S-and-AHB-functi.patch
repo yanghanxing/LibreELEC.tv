@@ -1,4 +1,4 @@
-From d67860fc1545c60bc5c5bfad455685a6ac1547ee Mon Sep 17 00:00:00 2001
+From 13a2e7f65fb64b2a7ae077dded32cae2e8c42a81 Mon Sep 17 00:00:00 2001
 From: Romain Perier <romain.perier@collabora.com>
 Date: Fri, 14 Apr 2017 10:31:12 +0200
 Subject: [PATCH 17/33] UPSTREAM: drm: dw-hdmi: add specific I2S and AHB

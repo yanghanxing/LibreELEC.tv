@@ -1,4 +1,4 @@
-From f3865b8667c4fcc623642b704b45e726fb8a7d06 Mon Sep 17 00:00:00 2001
+From 29a2a3217e16975a5a54401a9f88c55d25ba1154 Mon Sep 17 00:00:00 2001
 From: Eric Nelson <eric@nelint.com>
 Date: Sat, 3 Oct 2015 08:18:50 -0700
 Subject: [PATCH 1/5] UPSTREAM: [media] rc-core: define a default timeout for
@@ -28,7 +28,7 @@ index ec921f6538c7..f6494709e230 100644
  #define US_TO_NS(usec)		((usec) * 1000)
  #define MS_TO_US(msec)		((msec) * 1000)
 
-From 038989601ea2ec427c7fde6d5ee159cb4415f461 Mon Sep 17 00:00:00 2001
+From cbdef51121b8d0f0a30508cdae2f14fb96ded592 Mon Sep 17 00:00:00 2001
 From: Eric Nelson <eric@nelint.com>
 Date: Wed, 23 Sep 2015 11:07:08 -0300
 Subject: [PATCH 2/5] UPSTREAM: [media] rc: gpio-ir-recv: add timeout on idle
@@ -123,7 +123,7 @@ index 7dbc9ca6d885..f62e3f1f9d9d 100644
  	gpio_free(gpio_dev->gpio_nr);
  	kfree(gpio_dev);
 
-From eaadeecacb5830f49a5c19fb287b9e86fc3a78b4 Mon Sep 17 00:00:00 2001
+From 6ec7ca647a99b29200d0bc95039828d8da9ee5c3 Mon Sep 17 00:00:00 2001
 From: Sean Young <sean@mess.org>
 Date: Thu, 26 Jan 2017 14:37:33 -0200
 Subject: [PATCH 3/5] UPSTREAM: [media] gpio-ir: do not allow a timeout of 0
@@ -152,7 +152,7 @@ index f62e3f1f9d9d..56cf716d0cd4 100644
  	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
  	if (pdata->allowed_protos)
 
-From bba988d7aaba7205f7930c9335ad711d0725409b Mon Sep 17 00:00:00 2001
+From 6ba6f0695ef1144a0c1ffdb2984be0c0debdcb6a Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:34 +0200
 Subject: [PATCH 4/5] [media] rc/keymaps: add keytable for Pine64 Remote
@@ -179,7 +179,7 @@ index fbbd3bbcd252..8816520600f7 100644
  			rc-pinnacle-pctv-hd.o \
 diff --git a/drivers/media/rc/keymaps/rc-pine64.c b/drivers/media/rc/keymaps/rc-pine64.c
 new file mode 100644
-index 000000000000..2a7b1a669afe
+index 000000000000..46066bd1c998
 --- /dev/null
 +++ b/drivers/media/rc/keymaps/rc-pine64.c
 @@ -0,0 +1,65 @@
@@ -197,31 +197,31 @@ index 000000000000..2a7b1a669afe
 +#include <linux/module.h>
 +
 +static struct rc_map_table pine64[] = {
-+	{ 0x404000, KEY_0},
-+	{ 0x404001, KEY_1},
-+	{ 0x404002, KEY_2},
-+	{ 0x404003, KEY_3},
-+	{ 0x404004, KEY_4},
-+	{ 0x404005, KEY_5},
-+	{ 0x404006, KEY_6},
-+	{ 0x404007, KEY_7},
-+	{ 0x404008, KEY_8},
-+	{ 0x404009, KEY_9},
-+	{ 0x40400a, KEY_MUTE},
-+	{ 0x40400b, KEY_UP},
-+	{ 0x40400c, KEY_BACKSPACE},
-+	{ 0x40400d, KEY_OK},
-+	{ 0x40400e, KEY_DOWN},
-+	{ 0x404010, KEY_LEFT},
-+	{ 0x404011, KEY_RIGHT},
-+	{ 0x404017, KEY_VOLUMEDOWN},
-+	{ 0x404018, KEY_VOLUMEUP},
-+	{ 0x40401a, KEY_HOME},
-+	{ 0x40401d, KEY_MENU},
-+	{ 0x40401f, KEY_SEARCH},
-+	{ 0x404045, KEY_BACK},
-+	{ 0x404047, KEY_INFO},
-+	{ 0x40404d, KEY_POWER},
++	{ 0x404000, KEY_0 },
++	{ 0x404001, KEY_1 },
++	{ 0x404002, KEY_2 },
++	{ 0x404003, KEY_3 },
++	{ 0x404004, KEY_4 },
++	{ 0x404005, KEY_5 },
++	{ 0x404006, KEY_6 },
++	{ 0x404007, KEY_7 },
++	{ 0x404008, KEY_8 },
++	{ 0x404009, KEY_9 },
++	{ 0x40400a, KEY_MUTE },
++	{ 0x40400b, KEY_UP },
++	{ 0x40400c, KEY_BACKSPACE },
++	{ 0x40400d, KEY_OK },
++	{ 0x40400e, KEY_DOWN },
++	{ 0x404010, KEY_LEFT },
++	{ 0x404011, KEY_RIGHT },
++	{ 0x404017, KEY_VOLUMEDOWN },
++	{ 0x404018, KEY_VOLUMEUP },
++	{ 0x40401a, KEY_HOME },
++	{ 0x40401d, KEY_MENU },
++	{ 0x40401f, KEY_SEARCH },
++	{ 0x404045, KEY_BACK },
++	{ 0x404047, KEY_INFO },
++	{ 0x40404d, KEY_POWER },
 +};
 +
 +static struct rc_map_list pine64_map = {
@@ -261,7 +261,7 @@ index 7c4bbc4dfab4..3a34a9631dd1 100644
  #define RC_MAP_PINNACLE_GREY             "rc-pinnacle-grey"
  #define RC_MAP_PINNACLE_PCTV_HD          "rc-pinnacle-pctv-hd"
 
-From 0ee30fafea9bdbbb27e2b6ec64d8fe39def22597 Mon Sep 17 00:00:00 2001
+From 93c0048f59fe9a112f538d2b80f2f73d58c63254 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:35 +0200
 Subject: [PATCH 5/5] arm64: dts: rockchip: rk3328-rock64: add ir-receiver

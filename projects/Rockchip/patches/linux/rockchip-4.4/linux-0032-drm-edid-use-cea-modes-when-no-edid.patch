@@ -1,7 +1,7 @@
-From 8d19d11786b943ac9b16824b7d11c2b7660502f6 Mon Sep 17 00:00:00 2001
+From 07fcd831c08efa9fa1718b83e5997b280a3e7468 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Wed, 9 Aug 2017 09:28:49 +0200
-Subject: [PATCH 33/33] drm/edid: use cea modes when no edid
+Subject: [PATCH 32/33] drm/edid: use cea modes when no edid
 
 ---
  drivers/gpu/drm/drm_edid.c | 24 ++++++++++++++++++++++++

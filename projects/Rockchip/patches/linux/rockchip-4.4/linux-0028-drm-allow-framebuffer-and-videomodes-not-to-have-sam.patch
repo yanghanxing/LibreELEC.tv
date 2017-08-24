@@ -1,7 +1,7 @@
-From 6cb699834fdc86ccd8323b3dcd00da4249bdf171 Mon Sep 17 00:00:00 2001
+From 331d28c73147ac39135c7a3a405d1bc0c50cd8d4 Mon Sep 17 00:00:00 2001
 From: LongChair <LongChair@hotmail.com>
 Date: Mon, 24 Apr 2017 09:48:54 +0200
-Subject: [PATCH 29/33] drm : allow framebuffer and videomodes not to have same
+Subject: [PATCH 28/33] drm : allow framebuffer and videomodes not to have same
  size
 
 DRM legacy doesn't allow that, will be only available with drm atomic.

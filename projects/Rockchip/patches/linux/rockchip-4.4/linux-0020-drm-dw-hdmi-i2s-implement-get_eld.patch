@@ -1,4 +1,4 @@
-From d50232997930708d6cddd120c8315ba077688c6d Mon Sep 17 00:00:00 2001
+From aad1935cbacd849e63be43c09996c8416218a283 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 2 Apr 2017 11:33:39 +0200
 Subject: [PATCH 20/33] drm: dw-hdmi-i2s: implement get_eld

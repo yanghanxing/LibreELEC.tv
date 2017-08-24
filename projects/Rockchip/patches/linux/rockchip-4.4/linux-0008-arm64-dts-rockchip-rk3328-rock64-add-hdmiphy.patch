@@ -1,4 +1,4 @@
-From dc53166e66dcf5387a4ab722d473a7527234112d Mon Sep 17 00:00:00 2001
+From 72c7de3615fb8bfbc4a40e96b3285d111318896e Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:32 +0200
 Subject: [PATCH 08/33] arm64: dts: rockchip: rk3328-rock64: add hdmiphy

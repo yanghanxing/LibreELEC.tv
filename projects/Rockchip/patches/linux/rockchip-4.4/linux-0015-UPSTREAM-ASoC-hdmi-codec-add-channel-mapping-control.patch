@@ -1,4 +1,4 @@
-From 5c30657af15fe362fc46eb5db8cff8c12d49aa9b Mon Sep 17 00:00:00 2001
+From 59968e58efabf42642daff60fa8e7af9fca59587 Mon Sep 17 00:00:00 2001
 From: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Date: Tue, 3 Jan 2017 16:52:52 +0100
 Subject: [PATCH 15/33] UPSTREAM: ASoC: hdmi-codec: add channel mapping control

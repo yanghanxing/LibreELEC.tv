@@ -1,4 +1,4 @@
-From 2c4354e1b1f8c69a4bd657d552e869a62bfca06c Mon Sep 17 00:00:00 2001
+From 744c17ae6ac29db5d0c86c6de550907c1c92ff71 Mon Sep 17 00:00:00 2001
 From: Christophe Jaillet <christophe.jaillet@wanadoo.fr>
 Date: Thu, 15 Jun 2017 07:53:11 +0200
 Subject: [PATCH 16/33] UPSTREAM: ASoC: rockchip: Fix an error handling in

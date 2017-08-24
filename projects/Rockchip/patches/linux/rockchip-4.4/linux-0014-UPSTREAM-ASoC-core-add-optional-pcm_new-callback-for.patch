@@ -1,4 +1,4 @@
-From 3f809464b3e60449117653aecb657faa74503815 Mon Sep 17 00:00:00 2001
+From ac6e86c2b084f019e14727426d7ebe846c1ceeda Mon Sep 17 00:00:00 2001
 From: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Date: Tue, 3 Jan 2017 16:52:51 +0100
 Subject: [PATCH 14/33] UPSTREAM: ASoC: core: add optional pcm_new callback for

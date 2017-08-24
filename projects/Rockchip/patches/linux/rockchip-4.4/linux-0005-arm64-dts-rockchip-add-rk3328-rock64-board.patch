@@ -1,4 +1,4 @@
-From 988415248b84193bde60637f4ec7ef1dfa1e45b5 Mon Sep 17 00:00:00 2001
+From e62d66f6dae0f9f50e7ce896fa47d18ca363c6a7 Mon Sep 17 00:00:00 2001
 From: wlcheah <wlcheah@syabas.com>
 Date: Fri, 30 Jun 2017 12:27:25 +0800
 Subject: [PATCH 05/33] arm64: dts: rockchip: add rk3328-rock64 board

@@ -1,4 +1,4 @@
-From 020123eab13d7c15e757cd2a09cce7c84ee0d0cd Mon Sep 17 00:00:00 2001
+From 8e602b2bc87d7d186decee70660a6ad194081e43 Mon Sep 17 00:00:00 2001
 From: LongChair <LongChair@hotmail.com>
 Date: Thu, 15 Jun 2017 21:00:59 +0200
 Subject: [PATCH 03/33] arm64: dts: rockchip: rk3328: add missing operating

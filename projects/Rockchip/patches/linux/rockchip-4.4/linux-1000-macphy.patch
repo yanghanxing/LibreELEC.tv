@@ -1,4 +1,4 @@
-From f0ba698413c4cd8c4837ab22a4cb3fb5faacf201 Mon Sep 17 00:00:00 2001
+From 6077d9c6e8b77f3d7b8db79c8e0dff35c54fa56a Mon Sep 17 00:00:00 2001
 From: Phil Reid <preid@electromag.com.au>
 Date: Mon, 14 Dec 2015 11:31:59 +0800
 Subject: [PATCH 01/21] UPSTREAM: stmmac: create of compatible mdio bus for
@@ -120,7 +120,7 @@ index d02691ba3d7f..6a52fa18cbf2 100644
  	else
  		plat->mdio_bus_data =
 
-From ed471f07a1ccae0a6b57c5e6f9a0d1ffc910cd82 Mon Sep 17 00:00:00 2001
+From 1e5cd9d1b92c8d63f509b971feeee540f1d333d4 Mon Sep 17 00:00:00 2001
 From: Romain Perier <romain.perier@gmail.com>
 Date: Thu, 7 Jan 2016 21:13:28 +0100
 Subject: [PATCH 02/21] UPSTREAM: stmmac: Don't exit mdio registration when
@@ -169,7 +169,7 @@ index 16c85ccd1762..648488d46c1f 100644
  		pr_err("%s: Cannot register as MDIO bus\n", new_bus->name);
  		goto bus_register_fail;
 
-From 4335482ee1616516423c2626dc73876196b7e91f Mon Sep 17 00:00:00 2001
+From 56b337270c89ce33f7da65fdb7c8695f066231d1 Mon Sep 17 00:00:00 2001
 From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Date: Mon, 29 Feb 2016 14:27:39 +0100
 Subject: [PATCH 03/21] UPSTREAM: stmmac: do not poll phy handler when attach a
@@ -209,7 +209,7 @@ index e2305197ad49..8332e53ce9f4 100644
  		 " Link = %d\n", dev->name, phydev->phy_id, phydev->link);
  
 
-From 43eb4fc655cef3fd6505c69b0b605fc96826aa31 Mon Sep 17 00:00:00 2001
+From 548d401a4b278a0801ac6dd52c195c408c3a5b75 Mon Sep 17 00:00:00 2001
 From: Fabrice Gasnier <fabrice.gasnier@st.com>
 Date: Mon, 29 Feb 2016 14:27:40 +0100
 Subject: [PATCH 04/21] UPSTREAM: stmmac: fix phy init when attached to a phy
@@ -244,7 +244,7 @@ index 8332e53ce9f4..38738bee92eb 100644
  	pr_debug("stmmac_init_phy:  %s: attached to PHY (UID 0x%x)"
  		 " Link = %d\n", dev->name, phydev->phy_id, phydev->link);
 
-From a6cd430976cc0cbca45a671769125cb138643686 Mon Sep 17 00:00:00 2001
+From b999de4b300b9817319800bcd664a9435989315b Mon Sep 17 00:00:00 2001
 From: Phil Reid <preid@electromag.com.au>
 Date: Tue, 15 Mar 2016 15:34:33 +0800
 Subject: [PATCH 05/21] UPSTREAM: net: stmmac: Don't search for phys if mdio
@@ -286,7 +286,7 @@ index 648488d46c1f..db2173d7a01f 100644
  
  	return 0;
 
-From 4f7d9f6db8a316dcfcd75cdac19c4b67985ba814 Mon Sep 17 00:00:00 2001
+From e5adf148fb79989c325ab13dd7c3c14c97a35fa0 Mon Sep 17 00:00:00 2001
 From: Giuseppe CAVALLARO <peppe.cavallaro@st.com>
 Date: Fri, 1 Apr 2016 09:07:16 +0200
 Subject: [PATCH 06/21] UPSTREAM: stmmac: fix MDIO settings
@@ -533,7 +533,7 @@ index cddcbcc7a66f..985f13a856dd 100644
  	int clk_csr;
  	int has_gmac;
 
-From 19d06abc9c015cfa579c0011cfb4bca18f8f8fb2 Mon Sep 17 00:00:00 2001
+From f7209a1221e2ad0277c12906bb80a6e10f0d225a Mon Sep 17 00:00:00 2001
 From: Vincent Palatin <vpalatin@chromium.org>
 Date: Wed, 15 Jun 2016 11:32:22 -0700
 Subject: [PATCH 07/21] UPSTREAM: net: stmmac: dwmac-rk: keep the PHY up for
@@ -657,7 +657,7 @@ index 3080502e79de..b88cbefa0bf4 100644
  
  	plat_dat->bsp_priv = rk_gmac_setup(pdev, data);
 
-From 78e99c04093976518eb59509b636ee1d87941674 Mon Sep 17 00:00:00 2001
+From 2f0048d13b30b882adf71fcdcce40a3fc431cd00 Mon Sep 17 00:00:00 2001
 From: Joachim Eastwood <manabian@gmail.com>
 Date: Sat, 5 Nov 2016 14:04:49 +0100
 Subject: [PATCH 08/21] UPSTREAM: stmmac: dwmac-rk: turn resume/suspend into
@@ -771,7 +771,7 @@ index b88cbefa0bf4..049067f7576c 100644
  	},
  };
 
-From 50ef59c8caad3a18904fe16673aded40ae611ec9 Mon Sep 17 00:00:00 2001
+From c80a402358e9243e988a3644dd8c5d5d78fac3d1 Mon Sep 17 00:00:00 2001
 From: Joachim Eastwood <manabian@gmail.com>
 Date: Sat, 5 Nov 2016 14:04:50 +0100
 Subject: [PATCH 09/21] UPSTREAM: stmmac: dwmac-rk: turn exit into standard
@@ -845,7 +845,7 @@ index 049067f7576c..c8108d63b87f 100644
  		.name           = "rk_gmac-dwmac",
  		.pm		= &rk_gmac_pm_ops,
 
-From ec97773994960fff2b3fca8b1e9eaaf9f7080c11 Mon Sep 17 00:00:00 2001
+From 6fb4982fe2858019c93e36298b5741db18c254ab Mon Sep 17 00:00:00 2001
 From: Joachim Eastwood <manabian@gmail.com>
 Date: Sat, 5 Nov 2016 14:04:51 +0100
 Subject: [PATCH 10/21] UPSTREAM: stmmac: dwmac-rk: absorb rk_gmac_init into
@@ -901,7 +901,7 @@ index c8108d63b87f..638744fa3ae0 100644
  		return ret;
  
 
-From 5fdb285ac619b3886b0df417f89391dab4261e0b Mon Sep 17 00:00:00 2001
+From 589899a935e6fa8d68ad5e0f554b77b9fbc5e637 Mon Sep 17 00:00:00 2001
 From: Johan Hovold <johan@kernel.org>
 Date: Wed, 30 Nov 2016 15:29:51 +0100
 Subject: [PATCH 11/21] UPSTREAM: net: ethernet: stmmac: dwmac-rk: fix probe
@@ -941,7 +941,7 @@ index 638744fa3ae0..d48062220178 100644
  
  static int rk_gmac_remove(struct platform_device *pdev)
 
-From e8cfb53766eeabab1b3c5b44a42276f4d7ff306d Mon Sep 17 00:00:00 2001
+From a602659ebb376e3a9f128db9a64e8cbbc6870c27 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Heiko=20St=C3=BCbner?= <heiko@sntech.de>
 Date: Tue, 20 Dec 2016 17:17:06 +0100
 Subject: [PATCH 12/21] UPSTREAM: net: ethernet: stmmac: dwmac-rk: make clk
@@ -1000,7 +1000,7 @@ index d48062220178..cc106f06406a 100644
  	pm_runtime_get_sync(dev);
  
 
-From ec1704fc0acadc1b563b0147fdcc1328018ccbb0 Mon Sep 17 00:00:00 2001
+From 0a7eaff60f2b624bffdb1eaa68b16bc6854a6389 Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 21:56:40 +0800
 Subject: [PATCH 13/21] FROMLIST: net: phy: Add rockchip PHY driver support
@@ -1280,7 +1280,7 @@ index 000000000000..9f1be2e96697
 +MODULE_DESCRIPTION("Rockchip Ethernet PHY driver");
 +MODULE_LICENSE("GPL v2");
 
-From 09f501986fba87580e99f2aeb36f748a034d5d43 Mon Sep 17 00:00:00 2001
+From d7d873ab971aed404bcfa038e59ba20d67821d21 Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 21:56:43 +0800
 Subject: [PATCH 14/21] FROMLIST: net: stmmac: dwmac-rk: Remove unwanted code
@@ -1308,7 +1308,7 @@ index cc106f06406a..5cdb79da4857 100644
  
  static void rk3328_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
 
-From 96ce6a1e03faad60d4d464b3f9af1fb7f05632fc Mon Sep 17 00:00:00 2001
+From fd04d67da03c6b53b96a68e1e73c4654758a22cc Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 21:59:18 +0800
 Subject: [PATCH 15/21] FROMLIST: Documentation: net: phy: Add
@@ -1342,7 +1342,7 @@ index 525e1658f2da..b892d951037f 100644
  
  ethernet-phy@0 {
 
-From 5a0323323681b36271f82c3755a280741bf9797f Mon Sep 17 00:00:00 2001
+From 47979ec9a49632ef418ab42ac89e32fcf046af56 Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 22:00:02 +0800
 Subject: [PATCH 16/21] FROMLIST: net: stmmac: dwmac-rk: Add integrated PHY
@@ -1550,7 +1550,7 @@ index 5cdb79da4857..bb06090d9cbb 100644
  	if (ret)
  		return ret;
 
-From 18d08921613092d8e72deca0f0491fe195efdd91 Mon Sep 17 00:00:00 2001
+From ca17989cfdcc154016e4afe872186b5082b79317 Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 22:00:52 +0800
 Subject: [PATCH 17/21] FROMLIST: net: stmmac: dwmac-rk: Add integrated PHY
@@ -1652,7 +1652,7 @@ index bb06090d9cbb..dd4b6f574e3a 100644
  
  #define RK3366_GRF_SOC_CON6	0x0418
 
-From 14bdd9cfb5ea3718fe7ad526eec3d7067ef55c36 Mon Sep 17 00:00:00 2001
+From 0036adc9b4ffd49bd7b0ac0bac08db049fe95ca9 Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 22:01:41 +0800
 Subject: [PATCH 18/21] FROMLIST: ARM64: dts: rockchip: Add gmac2phy node
@@ -1724,7 +1724,7 @@ index 766084cf3205..ad3f29e4857c 100644
  		compatible = "rockchip,rk3328-usb", "rockchip,rk3066-usb",
  			     "snps,dwc2";
 
-From 9c0d66e7eaf434303afc98eabcbd37d28e59fe1d Mon Sep 17 00:00:00 2001
+From a8d232c71e2c4f159760fd896713607eebb495c8 Mon Sep 17 00:00:00 2001
 From: David Wu <david.wu@rock-chips.com>
 Date: Thu, 10 Aug 2017 22:02:01 +0800
 Subject: [PATCH 19/21] FROMLIST: ARM64: dts: rockchip: Enable gmac2phy for
@@ -1760,7 +1760,7 @@ index f834fff885e3..39f4f779c14b 100644
  	status = "okay";
  	mali-supply = <&vdd_logic>;
 
-From 06f0ee246a256898e7a0f2d348e2594afd636168 Mon Sep 17 00:00:00 2001
+From 4c7671ccd93819a974bb1b297b67a3c3c5cb8dcd Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Wed, 2 Aug 2017 12:31:12 +0200
 Subject: [PATCH 20/21] ARM64: dts: rockchip: Enable gmac2phy for rk3328-box
@@ -1791,7 +1791,7 @@ index 19794e11a4c8..d9903c4c9d6e 100644
  	status = "okay";
  	mali-supply = <&vdd_logic>;
 
-From fe71c1bd8e4da39b6da1ee3b562c92b71a56f93a Mon Sep 17 00:00:00 2001
+From 0812e90cfd6bd65701bad8b9c169b9efdb7b48ad Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sat, 12 Aug 2017 21:50:15 +0200
 Subject: [PATCH 21/21] net: stmmac: dwmac-rk: change vendor storage id for

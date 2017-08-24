@@ -1,4 +1,4 @@
-From a78eb584d3e0e9d426756b12f6f5e283a83f7aa7 Mon Sep 17 00:00:00 2001
+From a27f1901cab47bb16065731c64b89e50d519702d Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 2 May 2017 18:57:19 +0200
 Subject: [PATCH 22/33] ASoC: hdmi-codec: fix I2S audio in Kodi

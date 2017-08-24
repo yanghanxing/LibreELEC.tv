@@ -1,4 +1,4 @@
-From 74efe8e51d564000d708661b71681bb876ad54d1 Mon Sep 17 00:00:00 2001
+From 96a1467cf556cac89fcdd41fffc561da22ede831 Mon Sep 17 00:00:00 2001
 From: Sugar Zhang <sugar.zhang@rock-chips.com>
 Date: Wed, 7 Sep 2016 14:30:21 +0800
 Subject: [PATCH 12/33] UPSTREAM: ASoC: rockchip: spdif: restore register

@@ -1,4 +1,4 @@
-From ad7301faa9e60f8642ce2df437e407be9b4c22c1 Mon Sep 17 00:00:00 2001
+From d800502eb7e5dda4b60d24b3b0b331e7e17f9f5b Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:28 +0200
 Subject: [PATCH 04/33] arm64: dts: rockchip: add rk3328-box board

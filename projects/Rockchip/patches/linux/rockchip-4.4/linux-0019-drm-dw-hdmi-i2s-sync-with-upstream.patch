@@ -1,4 +1,4 @@
-From 934dc86eae8ff18abcbb0fc96210ce3f400cc6d6 Mon Sep 17 00:00:00 2001
+From e6cbd04f3bde6e5414f48719fd82a0cfd2f2e610 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Mon, 7 Aug 2017 22:24:15 +0200
 Subject: [PATCH 19/33] drm: dw-hdmi-i2s: sync with upstream

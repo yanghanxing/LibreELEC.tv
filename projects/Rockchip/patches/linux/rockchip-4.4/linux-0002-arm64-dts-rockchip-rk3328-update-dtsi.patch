@@ -1,4 +1,4 @@
-From cd72bac1d9107935d9ad8e27c1b593d99f0bd01b Mon Sep 17 00:00:00 2001
+From 795c1492aa91d1bb12f7840c55601c8cbfdec8c6 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:26 +0200
 Subject: [PATCH 02/33] arm64: dts: rockchip: rk3328: update dtsi

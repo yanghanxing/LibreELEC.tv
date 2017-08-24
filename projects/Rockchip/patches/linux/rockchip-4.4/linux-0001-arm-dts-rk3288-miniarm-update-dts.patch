@@ -1,4 +1,4 @@
-From a1593151e8b12f35b94c0f489749f9df70f35804 Mon Sep 17 00:00:00 2001
+From 2476f9439ef93dbf234fe44ae62b0a82543e87ad Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Sun, 13 Aug 2017 10:24:19 +0200
 Subject: [PATCH 01/33] arm: dts: rk3288-miniarm: update dts

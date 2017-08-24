@@ -1,4 +1,4 @@
-From 5880938e33a45e00572f9a34316c8aa79ba04194 Mon Sep 17 00:00:00 2001
+From 3205b19c7330cb810960666c9964219226c5ebe8 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 15 Aug 2017 18:43:47 +0200
 Subject: [PATCH 1/7] BACKPORT: HDMI CEC support from v4.13-rc5
@@ -9666,7 +9666,7 @@ index 2758687300b4..41e8dff588e1 100644
  /*
   * MT_TOOL types
 
-From 66f3c31080c802a3c1389fdaa8e629a368d1f0bc Mon Sep 17 00:00:00 2001
+From b2d77099d65ff5f61edf8d01e2c3249b3ff4d5e7 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 15 Aug 2017 18:43:48 +0200
 Subject: [PATCH 2/7] BACKPORT: Pulse Eight HDMI CEC from v4.13-rc5
@@ -10570,7 +10570,7 @@ index becdd78295cc..4588c66a8df0 100644
  
  #endif /* _UAPI_SERIO_H */
 
-From d184f464aa0af2352c66924eeba1cc426f0ea4b8 Mon Sep 17 00:00:00 2001
+From 2336ad41914fee17a2be12c7642193f3677e64c9 Mon Sep 17 00:00:00 2001
 From: Jonas Karlman <jonas@kwiboo.se>
 Date: Tue, 15 Aug 2017 18:43:49 +0200
 Subject: [PATCH 3/7] BACKPORT: RainShadow Tech HDMI CEC from v4.13-rc5
@@ -11054,7 +11054,7 @@ index 4588c66a8df0..89b72003fb68 100644
  
  #endif /* _UAPI_SERIO_H */
 
-From fb9ca229529348243b7ad49662cdb7aafca56115 Mon Sep 17 00:00:00 2001
+From 688bb069a0ce063a8c653b8c9b78f6dbe51dd4be Mon Sep 17 00:00:00 2001
 From: Russell King <rmk+kernel@armlinux.org.uk>
 Date: Mon, 31 Jul 2017 15:29:41 +0100
 Subject: [PATCH 4/7] FROMLIST: drm/bridge: dw-hdmi: add cec notifier support
@@ -11073,7 +11073,7 @@ Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
  2 files changed, 22 insertions(+)
 
 diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index ad65b3bd4e43..7b47a6180138 100644
+index df2dcc157f5a..0af0da74dde9 100644
 --- a/drivers/gpu/drm/bridge/Kconfig
 +++ b/drivers/gpu/drm/bridge/Kconfig
 @@ -10,6 +10,7 @@ menu "Display Interface Bridges"
@@ -11159,7 +11159,7 @@ index 9930dc78db4d..033d44d1bfe0 100644
  	switch_dev_unregister(&hdmi->switchdev);
  #endif
 
-From 9924a74790c60ee517bee227355c765bbf9ab263 Mon Sep 17 00:00:00 2001
+From e43cd8a6e39d61d62bbcf2096e3183175cf6b577 Mon Sep 17 00:00:00 2001
 From: Russell King <rmk+kernel@armlinux.org.uk>
 Date: Mon, 31 Jul 2017 15:29:46 +0100
 Subject: [PATCH 5/7] FROMLIST: drm/bridge: dw-hdmi: add better clock disable
@@ -11261,7 +11261,7 @@ index 033d44d1bfe0..3877e7c62396 100644
  	mutex_init(&hdmi->mutex);
  	mutex_init(&hdmi->audio_mutex);
 
-From 83742362adaf8df8de1a6408a7a7c43ea5528781 Mon Sep 17 00:00:00 2001
+From 2cedf1e07bf07200d6e5a7c5abc8c30d7e42cda1 Mon Sep 17 00:00:00 2001
 From: Russell King <rmk+kernel@armlinux.org.uk>
 Date: Mon, 31 Jul 2017 15:29:51 +0100
 Subject: [PATCH 6/7] FROMLIST: drm/bridge: dw-hdmi: add cec driver
@@ -11288,7 +11288,7 @@ Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
  create mode 100644 drivers/gpu/drm/bridge/dw-hdmi-cec.h
 
 diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index 7b47a6180138..a982bb5d3cfe 100644
+index 0af0da74dde9..618e184bc252 100644
 --- a/drivers/gpu/drm/bridge/Kconfig
 +++ b/drivers/gpu/drm/bridge/Kconfig
 @@ -31,6 +31,15 @@ config DRM_DW_HDMI_I2S_AUDIO
@@ -11308,7 +11308,7 @@ index 7b47a6180138..a982bb5d3cfe 100644
  	tristate "NXP PTN3460 DP/LVDS bridge"
  	depends on OF
 diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
-index dea158758ea5..667a90e88c7b 100644
+index e582bbbb808b..80f162935fef 100644
 --- a/drivers/gpu/drm/bridge/Makefile
 +++ b/drivers/gpu/drm/bridge/Makefile
 @@ -3,6 +3,7 @@ ccflags-y := -Iinclude/drm
@@ -11779,7 +11779,7 @@ index 57fafe0fd4f9..0c431405451f 100644
  /* CONFIG1_ID field values */
  	HDMI_CONFIG1_AHB = 0x01,
 
-From 2fee9c0f488a3e588cd7a4b9bbac62c16b70a5de Mon Sep 17 00:00:00 2001
+From a80f20c8e876e04ebc5d3713cb03a5e641c21217 Mon Sep 17 00:00:00 2001
 From: Russell King <rmk+kernel@armlinux.org.uk>
 Date: Mon, 31 Jul 2017 15:29:56 +0100
 Subject: [PATCH 7/7] FROMLIST: drm/bridge: dw-hdmi: remove CEC engine register

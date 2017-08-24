@@ -1,7 +1,7 @@
-From 766ce364430622e0a8dbd2837a66001da0197cce Mon Sep 17 00:00:00 2001
+From c4db4a6b5b426a80e7d7a7feaf50d813a671b95d Mon Sep 17 00:00:00 2001
 From: xuhuicong <xhc@rock-chips.com>
 Date: Fri, 23 Jun 2017 18:56:17 +0800
-Subject: [PATCH 32/33] drm/rockchip: hdmi: fix no sound some time
+Subject: [PATCH 31/33] drm/rockchip: hdmi: fix no sound some time
 
 Change-Id: Ic9f931d9a5b7bca954363293a20ca242eb0bfa6f
 Signed-off-by: xuhuicong <xhc@rock-chips.com>

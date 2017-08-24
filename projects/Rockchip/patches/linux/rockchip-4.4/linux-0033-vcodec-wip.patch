@@ -1,0 +1,38 @@
+From d5e2fd7af38920e568a1dc5bf8955b9a94c6b84f Mon Sep 17 00:00:00 2001
+From: Jonas Karlman <jonas@kwiboo.se>
+Date: Thu, 24 Aug 2017 21:08:43 +0200
+Subject: [PATCH 33/33] vcodec: wip
+
+---
+ drivers/video/rockchip/vcodec/vcodec_service.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/video/rockchip/vcodec/vcodec_service.c b/drivers/video/rockchip/vcodec/vcodec_service.c
+index f42422b04e78..f13695e5ccf3 100644
+--- a/drivers/video/rockchip/vcodec/vcodec_service.c
++++ b/drivers/video/rockchip/vcodec/vcodec_service.c
+@@ -2922,21 +2922,15 @@ static irqreturn_t vdpu_irq(int irq, void *dev_id)
+ 		time_record(task, 1);
+ 		vpu_debug(DEBUG_IRQ_STATUS, "vdpu_irq dec status %08x\n",
+ 			  dec_status);
+-		if ((dec_status & 0x40001) == 0x40001) {
+-			do {
+-				dec_status = readl_relaxed(dev->regs +
+-							   task->reg_irq);
+-			} while ((dec_status & 0x40001) == 0x40001);
+-		}
+-
+-		if (check_irq_err(task, dec_status))
+-			atomic_add(1, &pservice->reset_request);
+ 
+ 		writel_relaxed(0, dev->regs + task->reg_irq);
+ 
+ 		/* set clock gating to save power */
+ 		writel(task->gating_mask, dev->regs + task->reg_en);
+ 
++		if (check_irq_err(task, dec_status))
++			atomic_add(1, &pservice->reset_request);
++
+ 		atomic_add(1, &dev->irq_count_codec);
+ 		time_diff(task);
+ 		pservice->irq_status = raw_status;

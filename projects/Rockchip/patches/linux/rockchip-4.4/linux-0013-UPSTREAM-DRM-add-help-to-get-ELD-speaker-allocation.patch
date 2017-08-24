@@ -1,4 +1,4 @@
-From a83ff0d19ff1edb0ee49c5bea71fce42fa4016b3 Mon Sep 17 00:00:00 2001
+From b2b3f8a5e5b7b8d318591aeeac95e18d5e98fb1f Mon Sep 17 00:00:00 2001
 From: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Date: Tue, 3 Jan 2017 16:52:50 +0100
 Subject: [PATCH 13/33] UPSTREAM: DRM: add help to get ELD speaker allocation
